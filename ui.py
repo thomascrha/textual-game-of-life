@@ -1,13 +1,13 @@
 from rich.segment import Segment
 from rich.style import Style
+from textual.binding import Binding
 from textual.geometry import Offset, Region
 from textual.app import App, ComposeResult
 from textual.strip import Strip
 from textual.widget import Widget
+from textual.widgets import Footer
 from textual import events
 from textual.reactive import var
-
-from rich import print
 
 
 class Canvas(Widget):
@@ -29,8 +29,8 @@ class Canvas(Widget):
     }
     """
     ROW_HEIGHT: int = 2
-    CANVAS_HEIGHT: int = 50
-    CANVAS_WIDTH: int = 50
+    CANVAS_HEIGHT: int = 20
+    CANVAS_WIDTH: int = 20
 
     CANVAS_OFFSET: int = 2
 
@@ -39,6 +39,12 @@ class Canvas(Widget):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.x = -1
+        self.y = -1
+
+    def action_clear(self) -> None:
+        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.refresh()
 
     @property
     def white(self) -> Style:
@@ -57,10 +63,19 @@ class Canvas(Widget):
         mouse_position = event.offset + self.scroll_offset
         self.cursor_square = Offset(mouse_position.x // self.ROW_HEIGHT, mouse_position.y // int(self.ROW_HEIGHT / 2))
 
-    def on_mouse_click(self, event: events.Click) -> None:
+    def on_click(self, event: events.Click) -> None:
         """Called when the user clicks on the widget."""
         mouse_position = event.offset + self.scroll_offset
         self.cursor_square = Offset(mouse_position.x // self.ROW_HEIGHT, mouse_position.y // int(self.ROW_HEIGHT / 2))
+        self.clicked = True
+        self.x = self.cursor_square.x
+        self.y = self.cursor_square.y
+
+        # toggle the square
+        if len(self.canvas_matrix) > self.y and len(self.canvas_matrix[self.y]) > self.x:
+            self.canvas_matrix[self.y][self.x] ^= 1
+
+        self.refresh()
 
     def watch_cursor_square(
         self, previous_square: Offset, cursor_square: Offset
@@ -83,13 +98,12 @@ class Canvas(Widget):
 
     def render_line(self, y: int) -> Strip:
         """Render a line of the widget. y is relative to the top of the widget."""
-
         row_index = y // int(self.ROW_HEIGHT / 2)
+        if row_index == 0:
+            return Strip([Segment(f"X: {self.x} Y: {self.y}")])
 
         if row_index >= self.CANVAS_HEIGHT + self.CANVAS_OFFSET or row_index < self.CANVAS_OFFSET:
             return Strip.blank(self.size.width)
-
-        is_odd = row_index % 2
 
         def get_square_style(column: int, row: int) -> Style:
             """Get the cursor style at the given position on the checkerboard."""
@@ -112,9 +126,20 @@ class Canvas(Widget):
 
 
 class CellularAutomatonTui(App):
+    BINDINGS = [
+        Binding("t", "toggle", "Toggle"),
+        Binding("q", "quit", "Quit"),
+        Binding("c", "clear", "Clear", priority=True),
+        Binding("r", "random", "Random"),
+        Binding("p", "pause", "Pause")
+    ]
+
     def compose(self) -> ComposeResult:
         yield Canvas()
+        yield Footer()
 
+    def action_quit(self) -> None:
+        exit()
 
 if __name__ == "__main__":
     app = CellularAutomatonTui()

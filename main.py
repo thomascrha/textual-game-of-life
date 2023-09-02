@@ -59,9 +59,9 @@ class Canvas(Widget):
         return self.get_component_rich_style("canvas--cursor-square")
 
     @property
-    def header_region(self) -> Region:
+    def information_bar_region(self) -> Region:
         """Get the header region."""
-        return Region(0, 0, self.size.width, self.ROW_HEIGHT)
+        return Region(0, self.CANVAS_HEIGHT + 1, self.size.width, self.ROW_HEIGHT)
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
         """Called when the user moves the mouse over the widget."""
@@ -72,7 +72,6 @@ class Canvas(Widget):
         """Called when the user clicks on the widget."""
         mouse_position = event.offset + self.scroll_offset
         self.cursor_square = Offset(mouse_position.x // self.ROW_HEIGHT, mouse_position.y // int(self.ROW_HEIGHT / 2))
-        self.clicked = True
         self.x = self.cursor_square.x
         self.y = self.cursor_square.y
 
@@ -80,7 +79,7 @@ class Canvas(Widget):
         if len(self.canvas_matrix) > self.y and len(self.canvas_matrix[self.y]) > self.x:
             self.canvas_matrix[self.y][self.x] ^= 1
 
-        self.refresh(self.header_region)
+        self.refresh(self.information_bar_region)
         self.refresh(self.get_square_region(self.cursor_square))
 
     def get_square_region(self, square_offset: Offset) -> Region:
@@ -104,10 +103,11 @@ class Canvas(Widget):
     def render_line(self, y: int) -> Strip:
         """Render a line of the widget. y is relative to the top of the widget."""
         row_index = y // int(self.ROW_HEIGHT / 2)
-        if row_index == 0:
+        if row_index == self.CANVAS_HEIGHT + 1:
+            self.information_bar = True
             return Strip([Segment(f"X: {self.x} Y: {self.y}")])
 
-        if row_index >= self.CANVAS_HEIGHT + self.CANVAS_OFFSET or row_index < self.CANVAS_OFFSET:
+        if row_index >= self.CANVAS_HEIGHT:
             return Strip.blank(self.size.width)
 
         def get_square_style(column: int, row: int) -> Style:

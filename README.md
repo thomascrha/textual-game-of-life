@@ -1,3 +1,5 @@
-# cellular-automaton-tui
+# textual-game-of-life 
 
-A implementation of cellular automata in the terminal using textual.
+A implementation of Conway's game of life (cellular automata) in the terminal using textual.
+
+![textual-game-of-life](textual-game-of-life.jpg)

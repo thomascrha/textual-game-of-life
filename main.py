@@ -58,6 +58,11 @@ class Canvas(Widget):
     def cursor(self) -> Style:
         return self.get_component_rich_style("canvas--cursor-square")
 
+    @property
+    def header_region(self) -> Region:
+        """Get the header region."""
+        return Region(0, 0, self.size.width, self.ROW_HEIGHT)
+
     def on_mouse_move(self, event: events.MouseMove) -> None:
         """Called when the user moves the mouse over the widget."""
         mouse_position = event.offset + self.scroll_offset
@@ -75,26 +80,26 @@ class Canvas(Widget):
         if len(self.canvas_matrix) > self.y and len(self.canvas_matrix[self.y]) > self.x:
             self.canvas_matrix[self.y][self.x] ^= 1
 
-        self.refresh()
+        self.refresh(self.header_region)
+        self.refresh(self.get_square_region(self.cursor_square))
+
+    def get_square_region(self, square_offset: Offset) -> Region:
+        """Get region relative to widget from square coordinate."""
+        x, y = square_offset
+        region = Region(x * self.ROW_HEIGHT, y * int(self.ROW_HEIGHT / 2), self.ROW_HEIGHT, int(self.ROW_HEIGHT / 2))
+        # Move the region in to the widgets frame of reference
+        region = region.translate(-self.scroll_offset)
+        return region
 
     def watch_cursor_square(
         self, previous_square: Offset, cursor_square: Offset
     ) -> None:
         """Called when the cursor square changes."""
-
-        def get_square_region(square_offset: Offset) -> Region:
-            """Get region relative to widget from square coordinate."""
-            x, y = square_offset
-            region = Region(x * self.ROW_HEIGHT, y * int(self.ROW_HEIGHT / 2), self.ROW_HEIGHT, int(self.ROW_HEIGHT / 2))
-            # Move the region in to the widgets frame of reference
-            region = region.translate(-self.scroll_offset)
-            return region
-
         # Refresh the previous cursor square
-        self.refresh(get_square_region(previous_square))
+        self.refresh(self.get_square_region(previous_square))
 
         # Refresh the new cursor square
-        self.refresh(get_square_region(cursor_square))
+        self.refresh(self.get_square_region(cursor_square))
 
     def render_line(self, y: int) -> Strip:
         """Render a line of the widget. y is relative to the top of the widget."""
@@ -135,11 +140,16 @@ class CellularAutomatonTui(App):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Canvas()
+        self.canvas = Canvas()
+        yield self.canvas
         yield Footer()
 
     def action_quit(self) -> None:
         exit()
+
+    def action_clear(self) -> None:
+        self.canvas.action_clear()
+
 
 if __name__ == "__main__":
     app = CellularAutomatonTui()

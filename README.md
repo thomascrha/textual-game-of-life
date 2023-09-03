@@ -26,7 +26,3 @@ python3 main.py
 - [ ] add ctrl_+ and ctrl_- to change the vertical width of the canvas.
 - [ ] add alt_+ and alt_- to change the size of the pixels.
 - [ ] add a way to change the speed of the game.
-
-This will most likely spun into there own project.
-- [ ] look into using [textual-canvas](https://github.com/davep/textual-canvas) for the canvas - seems to have far smaller pixels. 
-- [ ] implement more automata rules. I may create a more general version of this program that can be used to implement any cellular automata.

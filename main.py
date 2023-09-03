@@ -45,8 +45,6 @@ class Canvas(Widget):
             [0 for _ in range(self.CANVAS_WIDTH + 1)]
             for _ in range(self.CANVAS_HEIGHT + 1)
         ]
-        self.cellular_automaton = CellularAutomaton(self.canvas_matrix)
-
         self.running = False
         self.x = -1
         self.y = -1

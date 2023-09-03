@@ -41,20 +41,14 @@ class Canvas(Widget):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.canvas_matrix = [
-            [0 for _ in range(self.CANVAS_WIDTH + 1)]
-            for _ in range(self.CANVAS_HEIGHT + 1)
-        ]
+        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.running = False
         self.x = -1
         self.y = -1
 
     def action_clear(self) -> None:
         print("clear")
-        self.canvas_matrix = [
-            [0 for _ in range(self.CANVAS_WIDTH + 1)]
-            for _ in range(self.CANVAS_HEIGHT + 1)
-        ]
+        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
 
     # step methods
@@ -70,19 +64,12 @@ class Canvas(Widget):
             for j in range(-1, 2):
                 if i == j == 0:
                     continue
-                neighbours.append(
-                    self.canvas_matrix[(y + i) % self.CANVAS_HEIGHT][
-                        (x + j) % self.CANVAS_WIDTH
-                    ]
-                )
+                neighbours.append(self.canvas_matrix[(y + i) % self.CANVAS_HEIGHT][(x + j) % self.CANVAS_WIDTH])
         return neighbours
 
     def get_next_generation(self) -> list[list[int]]:
         """Get the next generation of the canvas."""
-        new_canvas_matrix = [
-            [0 for _ in range(self.CANVAS_WIDTH + 1)]
-            for _ in range(self.CANVAS_HEIGHT + 1)
-        ]
+        new_canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         for y in range(self.CANVAS_HEIGHT):
             for x in range(self.CANVAS_WIDTH):
                 neighbours = self.get_neighbours(x, y)
@@ -108,10 +95,7 @@ class Canvas(Widget):
 
         self.CANVAS_HEIGHT -= 10
         self.CANVAS_WIDTH -= 10
-        self.canvas_matrix = [
-            [0 for _ in range(self.CANVAS_WIDTH + 1)]
-            for _ in range(self.CANVAS_HEIGHT + 1)
-        ]
+        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
 
     def action_increase_canvas(self) -> None:
@@ -121,10 +105,7 @@ class Canvas(Widget):
 
         self.CANVAS_HEIGHT += 10
         self.CANVAS_WIDTH += 10
-        self.canvas_matrix = [
-            [0 for _ in range(self.CANVAS_WIDTH + 1)]
-            for _ in range(self.CANVAS_HEIGHT + 1)
-        ]
+        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
 
     @property
@@ -163,10 +144,7 @@ class Canvas(Widget):
         self.y = self.cursor_square.y
 
         # toggle the square
-        if (
-            len(self.canvas_matrix) > self.y
-            and len(self.canvas_matrix[self.y]) > self.x
-        ):
+        if len(self.canvas_matrix) > self.y and len(self.canvas_matrix[self.y]) > self.x:
             self.canvas_matrix[self.y][self.x] ^= 1
 
         self.refresh(self.information_bar_region)
@@ -185,9 +163,7 @@ class Canvas(Widget):
         region = region.translate(-self.scroll_offset)
         return region
 
-    def watch_cursor_square(
-        self, previous_square: Offset, cursor_square: Offset
-    ) -> None:
+    def watch_cursor_square(self, previous_square: Offset, cursor_square: Offset) -> None:
         """Called when the cursor square changes."""
         # Refresh the previous cursor square
         self.refresh(self.get_square_region(previous_square))
@@ -212,21 +188,13 @@ class Canvas(Widget):
             else:
                 square_style = self.black
                 # only update the scauare that aren't out of range
-                if (
-                    len(self.canvas_matrix) > row
-                    and len(self.canvas_matrix[row]) > column
-                ):
-                    square_style = (
-                        self.black
-                        if self.canvas_matrix[row][column] == 1
-                        else self.white
-                    )
+                if len(self.canvas_matrix) > row and len(self.canvas_matrix[row]) > column:
+                    square_style = self.black if self.canvas_matrix[row][column] == 1 else self.white
 
             return square_style
 
         segments = [
-            Segment(" " * self.ROW_HEIGHT, get_square_style(column, row_index))
-            for column in range(self.CANVAS_WIDTH)
+            Segment(" " * self.ROW_HEIGHT, get_square_style(column, row_index)) for column in range(self.CANVAS_WIDTH)
         ]
         strip = Strip(segments)
         return strip

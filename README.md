@@ -2,9 +2,7 @@
 
 A implementation of Conway's game of life (cellular automata) in the terminal using textual.
 
-<video src="https://github.com/thomascrha/textual-game-of-life/assets/5226462/d3b92114-411c-4a95-95e9-559d648cf5d4
-" controls="controls" style="max-width: 730px;">
-</video>
+[textual-game-of-life](https://github.com/thomascrha/textual-game-of-life/assets/5226462/fd4cbdd6-29ab-41f6-87ea-181c79504e0b)
 
 ## Use
 

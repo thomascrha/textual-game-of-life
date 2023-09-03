@@ -37,6 +37,9 @@ class Canvas(Widget):
 
     REFRESH_INTERVAL: float = 5
 
+    MAX_CANVAS_HEIGHT: int = 100
+    MAX_CANVAS_WIDTH: int = 100
+
     cursor_square = var(Offset(0, 0))
 
     def __init__(self, **kwargs) -> None:
@@ -100,7 +103,7 @@ class Canvas(Widget):
 
     def action_increase_canvas(self) -> None:
         print("increase")
-        if self.CANVAS_HEIGHT >= 100 or self.CANVAS_WIDTH >= 100:
+        if self.CANVAS_HEIGHT >= self.MAX_CANVAS_HEIGHT or self.CANVAS_WIDTH >= self.MAX_CANVAS_WIDTH:
             return
 
         self.CANVAS_HEIGHT += 10
@@ -174,9 +177,6 @@ class Canvas(Widget):
     def render_line(self, y: int) -> Strip:
         """Render a line of the widget. y is relative to the top of the widget."""
         row_index = y // int(self.ROW_HEIGHT / 2)
-        if row_index == self.CANVAS_HEIGHT + 1:
-            self.information_bar = True
-            return Strip([Segment(f"X: {self.x} Y: {self.y}")])
 
         if row_index >= self.CANVAS_HEIGHT:
             return Strip.blank(self.size.width)

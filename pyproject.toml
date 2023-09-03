@@ -1,6 +1,25 @@
+[project]
+name = "example_package_YOUR_USERNAME_HERE"
+version = "0.0.1"
+authors = [
+  { name="Example Author", email="author@example.com" },
+]
+description = "A small example package"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/thomascrha/textual-game-of-life"
+"Bug Tracker" = "https://github.com/thomascrha/textual-game-of-life/issues"
+
 [tool.isort]
 profile = "black"
-src_paths = ["src", "tests"]
+src_paths = ["src"]
 lines_between_sections = 0
 multi_line_output = 3
 include_trailing_comma = true
@@ -16,14 +35,14 @@ line-length = 120
 include = '\.pyi?$'
 exclude = '''
 /(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
+    \.git |
+    \.hg |
+    \.mypy_cache |
+    \.tox |
+    \.venv |
+    _build |
+    buck-out |
+    build |
+    dist
 )/
 '''

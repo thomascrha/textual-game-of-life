@@ -1,3 +1,4 @@
+from typing import List
 from rich.segment import Segment
 from rich.style import Style
 from textual.binding import Binding
@@ -41,27 +42,24 @@ class Canvas(Widget):
     MAX_CANVAS_WIDTH: int = 100
 
     cursor_square = var(Offset(0, 0))
+    running: bool = False
+    x: int = -1
+    y: int = -1
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
-        self.running = False
-        self.x = -1
-        self.y = -1
+    def __init__(self) -> None:
+        super().__init__()
+        self.canvas_matrix: List[List[int]] = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
 
     def action_clear(self) -> None:
-        print("clear")
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
 
     # step methods
     def action_step(self) -> None:
-        print("step")
         self.canvas_matrix = self.get_next_generation()
         self.refresh()
 
     def get_neighbours(self, x: int, y: int) -> list[int]:
-        """Get the neighbours of a cell."""
         neighbours = []
         for i in range(-1, 2):
             for j in range(-1, 2):
@@ -71,7 +69,6 @@ class Canvas(Widget):
         return neighbours
 
     def get_next_generation(self) -> list[list[int]]:
-        """Get the next generation of the canvas."""
         new_canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         for y in range(self.CANVAS_HEIGHT):
             for x in range(self.CANVAS_WIDTH):
@@ -85,14 +82,12 @@ class Canvas(Widget):
         return new_canvas_matrix
 
     def action_random(self) -> None:
-        print("random")
         for y in range(self.CANVAS_HEIGHT):
             for x in range(self.CANVAS_WIDTH):
                 self.canvas_matrix[y][x] = random.randint(0, 1)
         self.refresh()
 
     def action_decrease_canvas(self) -> None:
-        print("decrease")
         if self.CANVAS_HEIGHT <= 10 or self.CANVAS_WIDTH <= 10:
             return
 
@@ -102,7 +97,6 @@ class Canvas(Widget):
         self.refresh()
 
     def action_increase_canvas(self) -> None:
-        print("increase")
         if self.CANVAS_HEIGHT >= self.MAX_CANVAS_HEIGHT or self.CANVAS_WIDTH >= self.MAX_CANVAS_WIDTH:
             return
 
@@ -123,13 +117,7 @@ class Canvas(Widget):
     def cursor(self) -> Style:
         return self.get_component_rich_style("canvas--cursor-square")
 
-    @property
-    def information_bar_region(self) -> Region:
-        """Get the header region."""
-        return Region(0, self.CANVAS_HEIGHT + 1, self.size.width, self.ROW_HEIGHT)
-
     def on_mouse_move(self, event: events.MouseMove) -> None:
-        """Called when the user moves the mouse over the widget."""
         mouse_position = event.offset + self.scroll_offset
         self.cursor_square = Offset(
             mouse_position.x // self.ROW_HEIGHT,
@@ -137,7 +125,6 @@ class Canvas(Widget):
         )
 
     def on_click(self, event: events.Click) -> None:
-        """Called when the user clicks on the widget."""
         mouse_position = event.offset + self.scroll_offset
         self.cursor_square = Offset(
             mouse_position.x // self.ROW_HEIGHT,
@@ -150,7 +137,6 @@ class Canvas(Widget):
         if len(self.canvas_matrix) > self.y and len(self.canvas_matrix[self.y]) > self.x:
             self.canvas_matrix[self.y][self.x] ^= 1
 
-        self.refresh(self.information_bar_region)
         self.refresh(self.get_square_region(self.cursor_square))
 
     def get_square_region(self, square_offset: Offset) -> Region:

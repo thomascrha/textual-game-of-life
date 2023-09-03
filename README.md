@@ -6,14 +6,14 @@ An implementation of Conway's game of life (cellular automata) in the terminal u
 
 ## install
 
-```bash
+```
 git clone textual-game-of-life # ;)
 pip3 install -r requirements.txt
 ```
-## usage
+## direct usage
 
-```bash
-python3 main.py
+```
+python3 -m src.textual_game_of_life
 ```
 
 ## todo

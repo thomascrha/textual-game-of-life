@@ -3,12 +3,44 @@ from rich.style import Style
 from textual.binding import Binding
 from textual.geometry import Offset, Region
 from textual.app import App, ComposeResult
+import time
 from textual.strip import Strip
 from textual.widget import Widget
 from textual.widgets import Footer
 from textual import events
 from textual.reactive import var
+import random
 
+
+class CellularAutomaton:
+    def __init__(self, canvas_matrix: list[list[int]]) -> None:
+        self.canvas_matrix = canvas_matrix
+        self.CANVAS_HEIGHT = len(canvas_matrix)
+        self.CANVAS_WIDTH = len(canvas_matrix[0])
+
+    def get_neighbours(self, x: int, y: int) -> list[int]:
+        """Get the neighbours of a cell."""
+        neighbours = []
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                if i == j == 0:
+                    continue
+                neighbours.append(self.canvas_matrix[(y + i) % self.CANVAS_HEIGHT][(x + j) % self.CANVAS_WIDTH])
+        return neighbours
+
+    def get_next_generation(self) -> list[list[int]]:
+        """Get the next generation of the canvas."""
+        new_canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH)] for _ in range(self.CANVAS_HEIGHT)]
+        for y in range(self.CANVAS_HEIGHT):
+            for x in range(self.CANVAS_WIDTH):
+                neighbours = self.get_neighbours(x, y)
+                if self.canvas_matrix[y][x] == 1:
+                    if 2 <= sum(neighbours) <= 3:
+                        new_canvas_matrix[y][x] = 1
+                else:
+                    if sum(neighbours) == 3:
+                        new_canvas_matrix[y][x] = 1
+        return new_canvas_matrix
 
 class Canvas(Widget):
     COMPONENT_CLASSES: set = {
@@ -34,16 +66,34 @@ class Canvas(Widget):
 
     CANVAS_OFFSET: int = 2
 
+    REFRESH_INTERVAL: float = 5
+
     cursor_square = var(Offset(0, 0))
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.cellular_automaton = CellularAutomaton(self.canvas_matrix)
+
+        self.running = False
         self.x = -1
         self.y = -1
 
     def action_clear(self) -> None:
+        print("clear")
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.refresh()
+
+    def action_step(self) -> None:
+        print("step")
+        self.canvas_matrix = self.cellular_automaton.get_next_generation()
+        self.refresh()
+
+    def action_random(self) -> None:
+        print("random")
+        for y in range(self.CANVAS_HEIGHT):
+            for x in range(self.CANVAS_WIDTH):
+                self.canvas_matrix[y][x] = random.randint(0, 1)
         self.refresh()
 
     @property
@@ -132,7 +182,7 @@ class Canvas(Widget):
 
 class CellularAutomatonTui(App):
     BINDINGS = [
-        Binding("t", "toggle", "Toggle"),
+        Binding("s", "step", "Step"),
         Binding("q", "quit", "Quit"),
         Binding("c", "clear", "Clear", priority=True),
         Binding("r", "random", "Random"),
@@ -149,6 +199,13 @@ class CellularAutomatonTui(App):
 
     def action_clear(self) -> None:
         self.canvas.action_clear()
+
+    def action_step(self) -> None:
+        self.canvas.action_step()
+
+    def action_random(self) -> None:
+        self.canvas.action_random()
+
 
 
 if __name__ == "__main__":

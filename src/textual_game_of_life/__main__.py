@@ -10,6 +10,12 @@ from textual.widgets import Footer
 from textual import events
 from textual.reactive import var
 import random
+from enum import Enum
+
+
+class Operation(str, Enum):
+    INCREASE = "increase"
+    DECREASE = "decrease"
 
 
 class Canvas(Widget):
@@ -87,23 +93,58 @@ class Canvas(Widget):
                 self.canvas_matrix[y][x] = random.randint(0, 1)
         self.refresh()
 
-    def action_decrease_canvas(self) -> None:
-        if self.CANVAS_HEIGHT <= 10 or self.CANVAS_WIDTH <= 10:
-            return
+    def alter_canvas_size(
+        self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
+    ) -> None:
 
-        self.CANVAS_HEIGHT -= 10
-        self.CANVAS_WIDTH -= 10
+        if horizontally:
+            if operation.value == "increase":
+                if self.CANVAS_WIDTH >= self.MAX_CANVAS_WIDTH:
+                    return
+
+                self.CANVAS_WIDTH += amount
+            elif operation.value == "decrease":
+                if self.CANVAS_WIDTH <= 10:
+                    return
+
+                self.CANVAS_WIDTH -= amount
+            else:
+                raise RuntimeError(f"Invalid operation: {operation}")
+
+        if vertically:
+            if operation.value == "increase":
+                if self.CANVAS_HEIGHT >= self.MAX_CANVAS_HEIGHT:
+                    return
+
+                self.CANVAS_HEIGHT += amount
+            elif operation.value == "decrease":
+                if self.CANVAS_HEIGHT <= 10:
+                    return
+
+                self.CANVAS_HEIGHT -= amount
+            else:
+                raise RuntimeError(f"Invalid operation: {operation}")
+
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
+
+    def action_decrease_canvas(self) -> None:
+        self.alter_canvas_size(Operation.DECREASE)
 
     def action_increase_canvas(self) -> None:
-        if self.CANVAS_HEIGHT >= self.MAX_CANVAS_HEIGHT or self.CANVAS_WIDTH >= self.MAX_CANVAS_WIDTH:
-            return
+        self.alter_canvas_size(Operation.INCREASE)
 
-        self.CANVAS_HEIGHT += 10
-        self.CANVAS_WIDTH += 10
-        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
-        self.refresh()
+    def action_decrease_canvas_horizontally(self) -> None:
+        self.alter_canvas_size(Operation.DECREASE, vertically=False)
+
+    def action_increase_canvas_horizontally(self) -> None:
+        self.alter_canvas_size(Operation.INCREASE, vertically=False)
+
+    def action_decrease_canvas_vertically(self) -> None:
+        self.alter_canvas_size(Operation.DECREASE, horizontally=False)
+
+    def action_increase_canvas_vertically(self) -> None:
+        self.alter_canvas_size(Operation.INCREASE, horizontally=False)
 
     @property
     def white(self) -> Style:
@@ -194,6 +235,10 @@ class CellularAutomatonTui(App):
         Binding("r", "random", "Random"),
         Binding("c", "clear", "Clear", priority=True),
         Binding("q", "quit", "Quit"),
+        Binding("left", "decrease_canvas_horizontally", "Decrease canvas size horizontally"),
+        Binding("right", "increase_canvas_horizontally", "Increase canvas size horizontally"),
+        Binding("down", "increase_canvas_vertically", "Increase canvas size vertically"),
+        Binding("up", "decrease_canvas_vertically", "Decrease canvas size vertically"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -209,6 +254,18 @@ class CellularAutomatonTui(App):
 
     def action_decrease_canvas(self) -> None:
         self.canvas.action_decrease_canvas()
+
+    def action_increase_canvas_horizontally(self) -> None:
+        self.canvas.action_increase_canvas_horizontally()
+
+    def action_decrease_canvas_horizontally(self) -> None:
+        self.canvas.action_decrease_canvas_horizontally()
+
+    def action_increase_canvas_vertically(self) -> None:
+        self.canvas.action_increase_canvas_vertically()
+
+    def action_decrease_canvas_vertically(self) -> None:
+        self.canvas.action_decrease_canvas_vertically()
 
     def action_clear(self) -> None:
         self.canvas.action_clear()

@@ -22,7 +22,7 @@ textual-game-of-life
 - [ ] add a command line interface for all the options and settings.
 - [ ] make cursor black when on a white cell and white when on a black cell.
 - [ ] add a way to save/load the current state of the game.
-- [ ] add shift_+ and shift_- to change the horizontal width of the canvas.
-- [ ] add ctrl_+ and ctrl_- to change the vertical width of the canvas.
+- [x] add left and right to change the horizontal width of the canvas.
+- [x] add up and down to change the vertical width of the canvas.
 - [ ] add alt_+ and alt_- to change the size of the pixels.
 - [ ] add a way to change the speed of the game.

@@ -1,21 +1,72 @@
+import asyncio
+import random
+from enum import Enum
 from typing import List
 from rich.segment import Segment
 from rich.style import Style
-from textual.binding import Binding
-from textual.geometry import Offset, Region
+from textual import events
 from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Grid
+from textual.geometry import Offset, Region
+from textual.reactive import var
+from textual.screen import ModalScreen
 from textual.strip import Strip
 from textual.widget import Widget
-from textual.widgets import Footer
-from textual import events
-from textual.reactive import var
-import random
-from enum import Enum
+from textual.widgets import Button, Footer, Label, Static
 
 
 class Operation(str, Enum):
     INCREASE = "increase"
     DECREASE = "decrease"
+
+
+class Help(ModalScreen):
+    DEFAULT_CSS = """
+    Help {
+        align: center middle;
+    }
+
+    #help-dialog {
+        padding: 1 1;
+        width: 70;
+        height: 40;
+        border: thick $background 80%;
+        background: $surface;
+    }
+
+    Button {
+        width: 100%;
+        align: center middle;
+    }
+    """
+    HELP_STRING = """
+
+    [b]Help[/b]
+
+    [b]S[/b] - Step one generation
+    [b]T[/b] - Toggle auto step
+    [b]+[/b] - Increse the size of the canvas
+    [b]-[/b] - Decrease the size of the canvas
+    [b]R[/b] - Random canvas
+    [b]C[/b] - Clear canvas
+    [b]Q[/b] - Quit
+    [b]LEFT[/b] - Decrease canvas horizontally
+    [b]RIGHT[/b] - Increase canvas horizontally
+    [b]DOWN[/b] - Increase canvas vertically
+    [b]UP[/b] - Decrease canvas vertically
+    [b]H[/b] - Help
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Grid(
+            Static(self.HELP_STRING, id="help"),
+            Button("Close", id="close"),
+            id="help-dialog",
+        )
+
+    def on_button_pressed(self, _: Button.Pressed) -> None:
+        self.app.pop_screen()
 
 
 class Canvas(Widget):
@@ -42,7 +93,7 @@ class Canvas(Widget):
 
     CANVAS_OFFSET: int = 2
 
-    REFRESH_INTERVAL: float = 5
+    REFRESH_INTERVAL: float = 0.5
 
     MAX_CANVAS_HEIGHT: int = 100
     MAX_CANVAS_WIDTH: int = 100
@@ -54,7 +105,9 @@ class Canvas(Widget):
 
     def __init__(self) -> None:
         super().__init__()
-        self.canvas_matrix: List[List[int]] = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.canvas_matrix: List[List[int]] = [
+            [0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)
+        ]
 
     def action_clear(self) -> None:
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
@@ -64,6 +117,12 @@ class Canvas(Widget):
     def action_step(self) -> None:
         self.canvas_matrix = self.get_next_generation()
         self.refresh()
+
+    async def action_toggle(self):
+        self.running = not self.running
+        while self.running:
+            await asyncio.sleep(self.REFRESH_INTERVAL)
+            self.action_step()
 
     def get_neighbours(self, x: int, y: int) -> list[int]:
         neighbours = []
@@ -96,6 +155,8 @@ class Canvas(Widget):
     def alter_canvas_size(
         self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
     ) -> None:
+        if self.running:
+            asyncio.create_task(self.action_toggle())
 
         if horizontally:
             if operation.value == "increase":
@@ -230,15 +291,17 @@ class Canvas(Widget):
 class CellularAutomatonTui(App):
     BINDINGS = [
         Binding("s", "step", "Step"),
-        Binding("+", "increase_canvas", "Increase canvas size"),
-        Binding("-", "decrease_canvas", "Decrease canvas size"),
+        Binding("t", "toggle", "Toggle"),
+        Binding("+", "increase_canvas", "Larger"),
+        Binding("-", "decrease_canvas", "Smaller"),
         Binding("r", "random", "Random"),
-        Binding("c", "clear", "Clear", priority=True),
+        Binding("c", "clear", "Clear"),
         Binding("q", "quit", "Quit"),
-        Binding("left", "decrease_canvas_horizontally", "Decrease canvas size horizontally"),
-        Binding("right", "increase_canvas_horizontally", "Increase canvas size horizontally"),
-        Binding("down", "increase_canvas_vertically", "Increase canvas size vertically"),
-        Binding("up", "decrease_canvas_vertically", "Decrease canvas size vertically"),
+        Binding("left", "decrease_canvas_horizontally", " "),
+        Binding("right", "increase_canvas_horizontally", " "),
+        Binding("down", "increase_canvas_vertically", " "),
+        Binding("up", "decrease_canvas_vertically", " "),
+        Binding("h", "help", "Help"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -267,6 +330,9 @@ class CellularAutomatonTui(App):
     def action_decrease_canvas_vertically(self) -> None:
         self.canvas.action_decrease_canvas_vertically()
 
+    def action_toggle(self) -> None:
+        asyncio.create_task(self.canvas.action_toggle())
+
     def action_clear(self) -> None:
         self.canvas.action_clear()
 
@@ -276,9 +342,14 @@ class CellularAutomatonTui(App):
     def action_random(self) -> None:
         self.canvas.action_random()
 
+    def action_help(self) -> None:
+        self.push_screen(Help())
+
+
 def main():
     app = CellularAutomatonTui()
     app.run()
+
 
 if __name__ == "__main__":
     main()

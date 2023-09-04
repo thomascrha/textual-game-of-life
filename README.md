@@ -1,4 +1,4 @@
-# textual-game-of-life 
+# textual-game-of-life
 
 An implementation of Conway's game of life (cellular automata) in the terminal using textual.
 
@@ -18,7 +18,9 @@ textual-game-of-life
 
 ## todo
 
-- [ ] add toggle for starting/stopping the game. 
+- [x] add about and help dialogs.
+- [ ] make brush draggable.
+- [x] add toggle for starting/stopping the game.
 - [ ] add a command line interface for all the options and settings.
 - [ ] make cursor black when on a white cell and white when on a black cell.
 - [ ] add a way to save/load the current state of the game.

@@ -219,7 +219,9 @@ class CellularAutomatonTui(App):
     def action_random(self) -> None:
         self.canvas.action_random()
 
-
-if __name__ == "__main__":
+def main():
     app = CellularAutomatonTui()
     app.run()
+
+if __name__ == "__main__":
+    main()

@@ -4,16 +4,16 @@ An implementation of Conway's game of life (cellular automata) in the terminal u
 
 [textual-game-of-life](https://github.com/thomascrha/textual-game-of-life/assets/5226462/66dd4153-d286-4680-ac73-8fd63e60c00e)
 
-## install
+## installation
 
 ```
-git clone textual-game-of-life # ;)
-pip3 install -r requirements.txt
+pip install textual-game-of-life
 ```
-## direct usage
+
+## usage
 
 ```
-python3 -m src.textual_game_of_life
+textual-game-of-life
 ```
 
 ## todo

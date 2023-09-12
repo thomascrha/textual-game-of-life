@@ -1,4 +1,6 @@
 import asyncio
+import json
+import os
 import random
 from enum import Enum
 from typing import List
@@ -105,17 +107,17 @@ class Canvas(Widget):
 
     def __init__(self) -> None:
         super().__init__()
-        self.canvas_matrix: List[List[int]] = [
+        self.matrix: List[List[int]] = [
             [0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)
         ]
 
     def clear(self) -> None:
-        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
 
     # step methods
     def step(self) -> None:
-        self.canvas_matrix = self.get_next_generation()
+        self.matrix = self.get_next_generation()
         self.refresh()
 
     async def toggle(self):
@@ -130,7 +132,7 @@ class Canvas(Widget):
             for j in range(-1, 2):
                 if i == j == 0:
                     continue
-                neighbours.append(self.canvas_matrix[(y + i) % self.CANVAS_HEIGHT][(x + j) % self.CANVAS_WIDTH])
+                neighbours.append(self.matrix[(y + i) % self.CANVAS_HEIGHT][(x + j) % self.CANVAS_WIDTH])
         return neighbours
 
     def get_next_generation(self) -> list[list[int]]:
@@ -138,7 +140,7 @@ class Canvas(Widget):
         for y in range(self.CANVAS_HEIGHT):
             for x in range(self.CANVAS_WIDTH):
                 neighbours = self.get_neighbours(x, y)
-                if self.canvas_matrix[y][x] == 1:
+                if self.matrix[y][x] == 1:
                     if 2 <= sum(neighbours) <= 3:
                         new_canvas_matrix[y][x] = 1
                 else:
@@ -149,8 +151,16 @@ class Canvas(Widget):
     def random(self) -> None:
         for y in range(self.CANVAS_HEIGHT):
             for x in range(self.CANVAS_WIDTH):
-                self.canvas_matrix[y][x] = random.randint(0, 1)
+                self.matrix[y][x] = random.randint(0, 1)
         self.refresh()
+
+    def extend_canvas(self) -> List[List[int]]:
+        matirx = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        for y, _ in enumerate(self.matrix):
+            for x, value in enumerate(self.matrix[y]):
+                if len(matirx) > y and len(matirx[y]) > x:
+                    matirx[y][x] = value
+        return matirx
 
     def alter_canvas_size(
         self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
@@ -186,7 +196,7 @@ class Canvas(Widget):
             else:
                 raise RuntimeError(f"Invalid operation: {operation}")
 
-        self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.matrix = self.extend_canvas()
         self.refresh()
 
     @property
@@ -218,8 +228,8 @@ class Canvas(Widget):
         self.y = self.cursor_square.y
 
         # toggle the square
-        if len(self.canvas_matrix) > self.y and len(self.canvas_matrix[self.y]) > self.x:
-            self.canvas_matrix[self.y][self.x] ^= 1
+        if len(self.matrix) > self.y and len(self.matrix[self.y]) > self.x:
+            self.matrix[self.y][self.x] ^= 1
 
         self.refresh(self.get_square_region(self.cursor_square))
 
@@ -258,8 +268,8 @@ class Canvas(Widget):
             else:
                 square_style = self.black
                 # only update the scauare that aren't out of range
-                if len(self.canvas_matrix) > row and len(self.canvas_matrix[row]) > column:
-                    square_style = self.black if self.canvas_matrix[row][column] == 1 else self.white
+                if len(self.matrix) > row and len(self.matrix[row]) > column:
+                    square_style = self.black if self.matrix[row][column] == 1 else self.white
 
             return square_style
 
@@ -276,8 +286,10 @@ class CellularAutomatonTui(App):
         Binding("t", "toggle", "Toggle"),
         Binding("+", "increase_canvas", "Larger"),
         Binding("-", "decrease_canvas", "Smaller"),
-        Binding("w", "increase_speed", "Faster"),
-        Binding("s", "decrease_speed", "Slower"),
+        Binding("f", "increase_speed", "Faster"),
+        Binding("l", "decrease_speed", "Slower"),
+        Binding("a", "save", "Save"),
+        Binding("o", "load", "Load"),
         Binding("r", "random", "Random"),
         Binding("c", "clear", "Clear"),
         Binding("q", "quit", "Quit"),
@@ -334,6 +346,29 @@ class CellularAutomatonTui(App):
 
     def action_help(self) -> None:
         self.push_screen(Help())
+
+    def action_save(self) -> None:
+        data = {
+            "matrix": self.canvas.matrix,
+            "canvas_width": self.canvas.CANVAS_WIDTH,
+            "canvas_height": self.canvas.CANVAS_HEIGHT,
+        }
+        with open("./save.textual", "w") as save_file:
+            json.dump(data, save_file)
+
+    def action_load(self) -> None:
+        if not os.path.exists("./save.textual"):
+            return
+
+        with open("./save.textual") as load_file:
+            data = json.load(load_file)
+            self.canvas.matrix = data.get(
+                "matrix",
+                [[0 for _ in range(self.canvas.CANVAS_WIDTH + 1)] for _ in range(self.canvas.CANVAS_HEIGHT + 1)],
+            )
+            self.canvas.CANVAS_WIDTH = data.get("canvas_width", self.canvas.CANVAS_WIDTH)
+            self.canvas.CANVAS_HEIGHT = data.get("canvas_height", self.canvas.CANVAS_HEIGHT)
+            self.canvas.refresh()
 
 
 def main():

@@ -20,6 +20,8 @@ textual-game-of-life
 
 - [x] add about and help dialogs.
 - [ ] make brush draggable.
+- [ ] add a way to change the brush size.
+- [ ] make resize canvas not delete existing data.
 - [x] add toggle for starting/stopping the game.
 - [ ] add a command line interface for all the options and settings.
 - [ ] make cursor black when on a white cell and white when on a black cell.
@@ -27,4 +29,4 @@ textual-game-of-life
 - [x] add left and right to change the horizontal width of the canvas.
 - [x] add up and down to change the vertical width of the canvas.
 - [ ] add alt_+ and alt_- to change the size of the pixels.
-- [ ] add a way to change the speed of the game.
+- [x] add a way to change the speed of the game.

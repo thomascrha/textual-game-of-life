@@ -109,20 +109,20 @@ class Canvas(Widget):
             [0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)
         ]
 
-    def action_clear(self) -> None:
+    def clear(self) -> None:
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
 
     # step methods
-    def action_step(self) -> None:
+    def step(self) -> None:
         self.canvas_matrix = self.get_next_generation()
         self.refresh()
 
-    async def action_toggle(self):
+    async def toggle(self):
         self.running = not self.running
         while self.running:
             await asyncio.sleep(self.REFRESH_INTERVAL)
-            self.action_step()
+            self.step()
 
     def get_neighbours(self, x: int, y: int) -> list[int]:
         neighbours = []
@@ -146,7 +146,7 @@ class Canvas(Widget):
                         new_canvas_matrix[y][x] = 1
         return new_canvas_matrix
 
-    def action_random(self) -> None:
+    def random(self) -> None:
         for y in range(self.CANVAS_HEIGHT):
             for x in range(self.CANVAS_WIDTH):
                 self.canvas_matrix[y][x] = random.randint(0, 1)
@@ -156,7 +156,7 @@ class Canvas(Widget):
         self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
     ) -> None:
         if self.running:
-            asyncio.create_task(self.action_toggle())
+            asyncio.create_task(self.toggle())
 
         if horizontally:
             if operation.value == "increase":
@@ -188,24 +188,6 @@ class Canvas(Widget):
 
         self.canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
         self.refresh()
-
-    def action_decrease_canvas(self) -> None:
-        self.alter_canvas_size(Operation.DECREASE)
-
-    def action_increase_canvas(self) -> None:
-        self.alter_canvas_size(Operation.INCREASE)
-
-    def action_decrease_canvas_horizontally(self) -> None:
-        self.alter_canvas_size(Operation.DECREASE, vertically=False)
-
-    def action_increase_canvas_horizontally(self) -> None:
-        self.alter_canvas_size(Operation.INCREASE, vertically=False)
-
-    def action_decrease_canvas_vertically(self) -> None:
-        self.alter_canvas_size(Operation.DECREASE, horizontally=False)
-
-    def action_increase_canvas_vertically(self) -> None:
-        self.alter_canvas_size(Operation.INCREASE, horizontally=False)
 
     @property
     def white(self) -> Style:
@@ -294,6 +276,8 @@ class CellularAutomatonTui(App):
         Binding("t", "toggle", "Toggle"),
         Binding("+", "increase_canvas", "Larger"),
         Binding("-", "decrease_canvas", "Smaller"),
+        Binding("w", "increase_speed", "Faster"),
+        Binding("s", "decrease_speed", "Slower"),
         Binding("r", "random", "Random"),
         Binding("c", "clear", "Clear"),
         Binding("q", "quit", "Quit"),
@@ -312,35 +296,41 @@ class CellularAutomatonTui(App):
     def action_quit(self) -> None:
         exit()
 
-    def action_increase_canvas(self) -> None:
-        self.canvas.action_increase_canvas()
-
     def action_decrease_canvas(self) -> None:
-        self.canvas.action_decrease_canvas()
+        self.canvas.alter_canvas_size(Operation.DECREASE)
 
-    def action_increase_canvas_horizontally(self) -> None:
-        self.canvas.action_increase_canvas_horizontally()
+    def action_increase_canvas(self) -> None:
+        self.canvas.alter_canvas_size(Operation.INCREASE)
 
     def action_decrease_canvas_horizontally(self) -> None:
-        self.canvas.action_decrease_canvas_horizontally()
+        self.canvas.alter_canvas_size(Operation.DECREASE, vertically=False)
 
-    def action_increase_canvas_vertically(self) -> None:
-        self.canvas.action_increase_canvas_vertically()
+    def action_increase_canvas_horizontally(self) -> None:
+        self.canvas.alter_canvas_size(Operation.INCREASE, vertically=False)
 
     def action_decrease_canvas_vertically(self) -> None:
-        self.canvas.action_decrease_canvas_vertically()
+        self.canvas.alter_canvas_size(Operation.DECREASE, horizontally=False)
+
+    def action_increase_canvas_vertically(self) -> None:
+        self.canvas.alter_canvas_size(Operation.INCREASE, horizontally=False)
 
     def action_toggle(self) -> None:
-        asyncio.create_task(self.canvas.action_toggle())
+        asyncio.create_task(self.canvas.toggle())
+
+    def action_increase_speed(self) -> None:
+        self.canvas.REFRESH_INTERVAL -= 0.1
+
+    def action_decrease_speed(self) -> None:
+        self.canvas.REFRESH_INTERVAL += 0.1
 
     def action_clear(self) -> None:
-        self.canvas.action_clear()
+        self.canvas.clear()
 
     def action_step(self) -> None:
-        self.canvas.action_step()
+        self.canvas.step()
 
     def action_random(self) -> None:
-        self.canvas.action_random()
+        self.canvas.random()
 
     def action_help(self) -> None:
         self.push_screen(Help())

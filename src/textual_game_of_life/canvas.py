@@ -16,7 +16,8 @@ class Canvas(Widget):
     COMPONENT_CLASSES: set = {
         "canvas--white-square",
         "canvas--black-square",
-        "canvas--cursor-square",
+        "canvas--cursor-square-white",
+        "canvas--cursor-square-black",
     }
 
     DEFAULT_CSS: str = """
@@ -26,8 +27,11 @@ class Canvas(Widget):
     Canvas .canvas--black-square {
         background: #000000;
     }
-    Canvas > .canvas--cursor-square {
-        background: darkred;
+    Canvas > .canvas--cursor-square-white {
+        background: #FFFFFF;
+    }
+    Canvas > .canvas--cursor-square-black {
+        background: #000000;
     }
     """
     ROW_HEIGHT: int = 2
@@ -45,6 +49,7 @@ class Canvas(Widget):
     running: bool = False
     x: int = -1
     y: int = -1
+    cursor_colour = "black"
 
     def __init__(self) -> None:
         super().__init__()
@@ -150,7 +155,7 @@ class Canvas(Widget):
 
     @property
     def cursor(self) -> Style:
-        return self.get_component_rich_style("canvas--cursor-square")
+        return self.get_component_rich_style(f"canvas--cursor-square-{self.cursor_colour}")
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
         mouse_position = event.offset + self.scroll_offset
@@ -158,6 +163,11 @@ class Canvas(Widget):
             mouse_position.x // self.ROW_HEIGHT,
             mouse_position.y // int(self.ROW_HEIGHT / 2),
         )
+
+        # only update the scauare that aren't out of range
+        self.cursor_colour = "black"
+        if len(self.matrix) > self.cursor_square.y and len(self.matrix[self.cursor_square.y]) > self.cursor_square.x:
+            self.cursor_colour = "black" if self.matrix[self.cursor_square.y][self.cursor_square.x] == 0 else "white"
 
     def on_click(self, event: events.Click) -> None:
         mouse_position = event.offset + self.scroll_offset

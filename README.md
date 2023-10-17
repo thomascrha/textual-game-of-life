@@ -22,7 +22,7 @@ textual-game-of-life
 - [ ] add feature to make save file anything i.e. file dialog
 - [ ] add a way to change the brush size.
 - [ ] add a command line interface for all the options and settings.
-- [ ] make cursor black when on a white cell and white when on a black cell.
+- [x] make cursor black when on a white cell and white when on a black cell.
 - [x] make resize canvas not delete existing data.
 - [x] add toggle for starting/stopping the game.
 - [x] add about and help dialogs.

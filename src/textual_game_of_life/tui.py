@@ -90,51 +90,86 @@ class CellularAutomatonTui(App[Any]):
 
     def action_decrease_canvas(self) -> None:
         self.canvas.alter_canvas_size(Operation.DECREASE)
+        self.display_message("Canvas size decreased", 1.0)
 
     def action_increase_canvas(self) -> None:
         self.canvas.alter_canvas_size(Operation.INCREASE)
+        self.display_message("Canvas size increased", 1.0)
 
     def action_decrease_canvas_horizontally(self) -> None:
         self.canvas.alter_canvas_size(Operation.DECREASE, vertically=False)
+        self.display_message("Canvas width decreased", 1.0)
 
     def action_increase_canvas_horizontally(self) -> None:
         self.canvas.alter_canvas_size(Operation.INCREASE, vertically=False)
+        self.display_message("Canvas width increased", 1.0)
 
     def action_decrease_canvas_vertically(self) -> None:
         self.canvas.alter_canvas_size(Operation.DECREASE, horizontally=False)
+        self.display_message("Canvas height decreased", 1.0)
 
     def action_increase_canvas_vertically(self) -> None:
         self.canvas.alter_canvas_size(Operation.INCREASE, horizontally=False)
+        self.display_message("Canvas height increased", 1.0)
 
     def action_toggle(self) -> None:
-        asyncio.create_task(self.canvas.toggle())
+        try:
+            # In normal operation, create a task that can be properly managed
+            task = self.canvas.toggle()
+            asyncio.create_task(task)
+        except RuntimeError:
+            # No running event loop (likely in test environment)
+            # Just toggle the running state directly
+            self.canvas.running = not self.canvas.running
+            status = "Simulation started" if self.canvas.running else "Simulation paused"
+            self.display_message(status, 1.0)
 
     def action_increase_speed(self) -> None:
         self.canvas.refresh_interval -= 0.1
+        self.display_message(f"Speed increased - {self.canvas.refresh_interval:.1f}s per step", 1.0)
 
     def action_decrease_speed(self) -> None:
         self.canvas.refresh_interval += 0.1
+        self.display_message(f"Speed decreased - {self.canvas.refresh_interval:.1f}s per step", 1.0)
 
     def action_clear(self) -> None:
         self.canvas.clear()
+        self.display_message("Canvas cleared", 1.0)
 
     def action_step(self) -> None:
         self.canvas.step()
+        self.display_message("Advanced one generation", 1.0)
 
     def action_random(self) -> None:
         self.canvas.random()
+        self.display_message("Random pattern generated", 1.0)
 
     def action_add_glider(self) -> None:
         self.canvas.add_random_glider()
+        self.display_message("Random glider added", 1.0)
 
     def action_add_pulsar(self) -> None:
         self.canvas.add_random_pulsar()
+        self.display_message("Random pulsar added", 1.0)
+
+    def display_message(self, text: str, timeout: float = 3.0) -> None:
+        """Display a temporary message on the canvas.
+
+        Args:
+            text: The message to display
+            timeout: How long to show the message in seconds
+        """
+        self.canvas.display_message(text, timeout)
 
     def action_help(self) -> None:
         # Pause animation if running when opening help screen
         was_running = self.canvas.running
         if was_running:
-            asyncio.create_task(self.canvas.toggle())
+            try:
+                asyncio.create_task(self.canvas.toggle())
+            except RuntimeError:
+                # No running event loop (likely in test environment)
+                self.canvas.running = not self.canvas.running
         help_screen = Help()
         help_screen.was_running = was_running
         self.push_screen(help_screen)
@@ -143,9 +178,14 @@ class CellularAutomatonTui(App[Any]):
         # Pause animation if running when opening about screen
         was_running = self.canvas.running
         if was_running:
-            asyncio.create_task(self.canvas.toggle())
+            try:
+                asyncio.create_task(self.canvas.toggle())
+            except RuntimeError:
+                # No running event loop (likely in test environment)
+                self.canvas.running = not self.canvas.running
         about_screen = About(self.VERSION)
         about_screen.was_running = was_running
+
         self.push_screen(about_screen)
 
     def action_save(self) -> None:
@@ -156,9 +196,11 @@ class CellularAutomatonTui(App[Any]):
         }
         with open("./save.textual", "w") as save_file:
             json.dump(data, save_file)
+        self.display_message("Game state saved to save.textual", 1.0)
 
     def action_load(self) -> None:
         if not os.path.exists("./save.textual"):
+            self.display_message("Save file not found", 1.0)
             return
 
         with open("./save.textual") as load_file:
@@ -170,3 +212,4 @@ class CellularAutomatonTui(App[Any]):
             self.canvas.canvas_width = data.get("canvas_width", self.canvas.canvas_width)
             self.canvas.canvas_height = data.get("canvas_height", self.canvas.canvas_height)
             self.canvas.refresh()
+            self.display_message("Game state loaded from save.textual", 1.0)

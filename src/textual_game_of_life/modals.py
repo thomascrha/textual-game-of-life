@@ -102,6 +102,7 @@ class Help(ModalScreen[Any]):
     [b]G[/b] - Add random glider
     [b]P[/b] - Add random pulsar
     [b]C[/b] - Clear canvas
+    [b]M[/b] - Show example message
     [b]Q[/b] - Quit
     [b]LEFT[/b] - Decrease canvas horizontally
     [b]RIGHT[/b] - Increase canvas horizontally

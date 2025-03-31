@@ -17,7 +17,7 @@ pip install textual-game-of-life
 textual-game-of-life
 ```
 
-## development 
+## development
 There is a Makefile for development tasks. You can use it to create a virtual environment, run tests, and build the package.
 
 ```console

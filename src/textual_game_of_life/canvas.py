@@ -1,7 +1,9 @@
 import asyncio
 import random
+import time
 from rich.segment import Segment
 from rich.style import Style
+from rich.text import Text
 from textual import events
 from textual.geometry import Offset, Region
 from textual.reactive import var
@@ -11,7 +13,7 @@ from . import Operation
 
 
 class Canvas(Widget):
-    COMPONENT_CLASSES: set[str] = {
+    COMPONENT_CLASSES: set[str] = Widget.COMPONENT_CLASSES | {
         "canvas--white-square",
         "canvas--black-square",
         "canvas--cursor-square-white",
@@ -38,6 +40,14 @@ class Canvas(Widget):
 
     refresh_interval: float = 0.5
 
+    # Message display settings
+    message: str = ""
+    message_visible: bool = False
+    message_timeout: float = 3.0  # Default timeout in seconds
+    message_timestamp: float = 0.0
+    message_style: Style = Style(color="bright_white", bgcolor="dark_blue", bold=True, italic=True)
+    message_task: asyncio.Task | None = None  # Track the current message timeout task
+
     MAX_CANVAS_HEIGHT: int = 100
     MAX_CANVAS_WIDTH: int = 100
 
@@ -61,11 +71,71 @@ class Canvas(Widget):
         self.canvas_height = height
         self.refresh_interval = speed
         self.brush_size = max(min(brush_size, self.MAX_BRUSH_SIZE), self.MIN_BRUSH_SIZE)
-        self.mouse_captured = True
+        self.mouse_captured: bool = True
 
         self.matrix: list[list[int]] = [
             [0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)
         ]
+
+        # Initialize message display
+        self.message = ""
+        self.message_visible = False
+        self.message_timestamp = 0.0
+        self.message_timeout = 3.0  # Default timeout in seconds
+        self.message_task = None
+
+    def display_message(self, text: str, timeout: float = 3.0) -> None:
+        """Display a message on the canvas with automatic timeout.
+
+        Args:
+            text: The message text to display
+            timeout: Time in seconds before the message disappears
+        """
+        # Cancel any existing message timeout task
+        if self.message_task and not self.message_task.done():
+            self.message_task.cancel()
+
+        # Set the new message
+        self.message = text
+        self.message_visible = True
+        self.message_timestamp = time.time()
+        self.message_timeout = timeout
+        self.refresh()  # Force refresh to show the message
+
+        # Schedule the message removal and track the task
+        try:
+            # Create and store the task for auto-timeout
+            self.message_task = asyncio.create_task(self._message_timeout_task())
+        except RuntimeError:
+            # No running event loop (likely in test environment)
+            # For test environments, just mark message as not visible after timeout
+            # to avoid the unawaited coroutine warning
+            self.message_visible = False
+
+    async def _message_timeout_task(self) -> None:
+        """Task to automatically hide the message after timeout."""
+        try:
+            await asyncio.sleep(self.message_timeout)
+            if self.message_visible:
+                self.message_visible = False
+                self.refresh()
+        except asyncio.CancelledError:
+            # Task was cancelled, likely because a new message is being displayed
+            pass
+
+    def clear_message(self) -> None:
+        """Immediately clear the current message."""
+        if self.message_visible:
+            # Cancel any existing message timeout task
+            if self.message_task and not self.message_task.done():
+                try:
+                    self.message_task.cancel()
+                except (RuntimeError, AttributeError):
+                    # No running event loop or task is None
+                    pass
+
+            self.message_visible = False
+            self.refresh()
 
     def clear(self) -> None:
         self.matrix = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
@@ -77,10 +147,18 @@ class Canvas(Widget):
         self.refresh()
 
     async def toggle(self):
+        """Toggle the animation state.
+
+        In normal operation, this runs in a loop updating the simulation.
+        In test environments, this may not be awaited, so we handle that case.
+        """
         self.running = not self.running
-        while self.running:
-            await asyncio.sleep(self.refresh_interval)
-            self.step()
+        # Only enter the animation loop if we're in a real event loop context
+        # This prevents the "coroutine was never awaited" warning in tests
+        if self.running and asyncio.get_event_loop().is_running():
+            while self.running:
+                await asyncio.sleep(self.refresh_interval)
+                self.step()
 
     def get_neighbours(self, x: int, y: int) -> list[int]:
         neighbours = []
@@ -182,8 +260,7 @@ class Canvas(Widget):
 
         # Place all cells of the pulsar
         for row, col in pulsar_cells:
-            if (y + row < self.canvas_height and
-                x + col < self.canvas_width):
+            if y + row < self.canvas_height and x + col < self.canvas_width:
                 self.matrix[y + row][x + col] = 1
 
         self.refresh()
@@ -200,7 +277,11 @@ class Canvas(Widget):
         self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
     ) -> None:
         if self.running:
-            asyncio.create_task(self.toggle())
+            try:
+                asyncio.create_task(self.toggle())
+            except RuntimeError:
+                # No running event loop (likely in test environment)
+                self.running = not self.running
 
         if horizontally:
             if operation.value == "increase":
@@ -328,16 +409,24 @@ class Canvas(Widget):
         """Render a line of the widget. y is relative to the top of the widget."""
         row_index = y // int(self.ROW_HEIGHT / 2)
 
+        # Check if this line should display the message
+        if self.message_visible and y == self.size.height - 2:  # Position at the bottom
+            # Create a full-width message with padding
+            padding = " " * 2  # Add some padding at the start
+            return Strip([Segment(f"{padding}{self.message}", self.message_style)])
+
+        # Don't render canvas content for lines beyond the canvas height
         if row_index >= self.canvas_height:
             return Strip.blank(self.size.width)
 
+        # Normal canvas rendering
         def get_square_style(column: int, row: int) -> Style:
             """Get the cursor style at the given position on the checkerboard."""
             if self.cursor_square == Offset(column, row):
                 square_style = self.cursor
             else:
                 square_style = self.black
-                # only update the scauare that aren't out of range
+                # only update the square that aren't out of range
                 if len(self.matrix) > row and len(self.matrix[row]) > column:
                     square_style = self.black if self.matrix[row][column] == 1 else self.white
 

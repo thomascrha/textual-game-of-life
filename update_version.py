@@ -97,13 +97,6 @@ def main():
         print("No files were updated. Version might already be set correctly.")
         return 0
 
-    print(f"\n🎉 Successfully updated version to {new_version} in {len(updated)} files")
-    print("\nNext steps:")
-    print("1. Review changes with 'git diff'")
-    print(f"2. Commit changes: 'git commit -am \"Bump version to {new_version}\"'")
-    print(f"3. Create a tag: 'git tag v{new_version}'")
-    print("4. Push changes and tags: 'git push && git push --tags'")
-
     return 0
 
 

@@ -110,6 +110,84 @@ class Canvas(Widget):
                 self.matrix[y][x] = random.randint(0, 1)
         self.refresh()
 
+    def add_random_glider(self) -> None:
+        """Add a glider pattern at a random position on the canvas."""
+        # Random position (leaving room for the 3x3 glider pattern)
+        x = random.randint(0, self.canvas_width - 3)
+        y = random.randint(0, self.canvas_height - 3)
+
+        # Clear the area for the glider
+        for i in range(3):
+            for j in range(3):
+                if y + i < self.canvas_height and x + j < self.canvas_width:
+                    self.matrix[y + i][x + j] = 0
+
+        # Standard glider pattern (will move southeast)
+        # .O.
+        # ..O
+        # OOO
+        if y < self.canvas_height and x + 1 < self.canvas_width:
+            self.matrix[y][x + 1] = 1  # Top middle
+        if y + 1 < self.canvas_height and x + 2 < self.canvas_width:
+            self.matrix[y + 1][x + 2] = 1  # Middle right
+        if y + 2 < self.canvas_height:
+            for j in range(3):
+                if x + j < self.canvas_width:
+                    self.matrix[y + 2][x + j] = 1  # Bottom row
+
+        self.refresh()
+
+    def add_random_pulsar(self) -> None:
+        """Add a pulsar pattern (period-3 oscillator) at a random position on the canvas."""
+        # Pulsar requires a 17x17 area (13x13 with 2-cell border all around)
+        pulsar_size = 17
+
+        # Check if canvas is big enough
+        if self.canvas_width < pulsar_size or self.canvas_height < pulsar_size:
+            return  # Canvas too small for pulsar
+
+        # Random position (leaving room for the pulsar pattern with border)
+        x = random.randint(0, self.canvas_width - pulsar_size)
+        y = random.randint(0, self.canvas_height - pulsar_size)
+
+        # Clear the area for the pulsar (including border)
+        for i in range(pulsar_size):
+            for j in range(pulsar_size):
+                if y + i < self.canvas_height and x + j < self.canvas_width:
+                    self.matrix[y + i][x + j] = 0
+
+        # Add 2-cell buffer to allow pattern to oscillate properly
+        buffer = 2
+        x += buffer
+        y += buffer
+
+        # The correct pulsar pattern has 4 sets of 3-cell segments:
+        # - Horizontal segments at rows 2, 7, 9, 14 with columns 4-6 and 10-12
+        # - Vertical segments at columns 2, 7, 9, 14 with rows 4-6 and 10-12
+
+        # Create full coordinates list for all cells in the pulsar
+        pulsar_cells = []
+
+        # Top and bottom horizontal bars
+        for row in [0, 5, 7, 12]:
+            for col in range(2, 5):
+                pulsar_cells.append((row, col))
+                pulsar_cells.append((row, col + 6))
+
+        # Left and right vertical bars
+        for col in [0, 5, 7, 12]:
+            for row in range(2, 5):
+                pulsar_cells.append((row, col))
+                pulsar_cells.append((row + 6, col))
+
+        # Place all cells of the pulsar
+        for row, col in pulsar_cells:
+            if (y + row < self.canvas_height and
+                x + col < self.canvas_width):
+                self.matrix[y + row][x + col] = 1
+
+        self.refresh()
+
     def extend_canvas(self) -> list[list[int]]:
         matirx = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
         for y, _ in enumerate(self.matrix):

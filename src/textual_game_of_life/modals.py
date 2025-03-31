@@ -99,6 +99,8 @@ class Help(ModalScreen[Any]):
     [b]A[/b] - Save game state
     [b]O[/b] - Load game state
     [b]R[/b] - Random canvas
+    [b]G[/b] - Add random glider
+    [b]P[/b] - Add random pulsar
     [b]C[/b] - Clear canvas
     [b]Q[/b] - Quit
     [b]LEFT[/b] - Decrease canvas horizontally

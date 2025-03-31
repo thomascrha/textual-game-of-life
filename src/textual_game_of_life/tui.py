@@ -52,6 +52,8 @@ class CellularAutomatonTui(App[Any]):
         Binding("a", "save", "Save"),
         Binding("o", "load", "Load"),
         Binding("r", "random", "Random"),
+        Binding("g", "add_glider", "Glider"),
+        Binding("p", "add_pulsar", "Pulsar"),
         Binding("c", "clear", "Clear"),
         Binding("q", "quit", "Quit"),
         Binding("left", "decrease_canvas_horizontally", " "),
@@ -121,6 +123,12 @@ class CellularAutomatonTui(App[Any]):
 
     def action_random(self) -> None:
         self.canvas.random()
+
+    def action_add_glider(self) -> None:
+        self.canvas.add_random_glider()
+
+    def action_add_pulsar(self) -> None:
+        self.canvas.add_random_pulsar()
 
     def action_help(self) -> None:
         # Pause animation if running when opening help screen

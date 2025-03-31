@@ -78,10 +78,6 @@ def test_alter_canvas_size_constraints(canvas):
     """Test that canvas size alterations respect min/max constraints."""
     from src.textual_game_of_life import Operation
 
-    # Test minimum size constraint
-    original_width = canvas.canvas_width
-    original_height = canvas.canvas_height
-
     # Try to reduce below minimum (10)
     canvas.alter_canvas_size(Operation.DECREASE, amount=100)
 

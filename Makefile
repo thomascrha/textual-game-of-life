@@ -23,10 +23,8 @@ create_venv: ## Create a virtual environment
 setup: create_venv ## Create and activate the virtual environment
 	@if ! $(PYTHON) -m pip show textual > /dev/null 2>&1; then \
 		$(PYTHON) -m pip install --upgrade pip; \
-		$(PYTHON) -m pip install .[build]; \
-		$(PYTHON) -m pip install .[test]; \
-		$(PYTHON) -m pip install .; \
-		$(PYTHON) -m pip uninstall -y textual-game-of-life; \
+		$(PYTHON) -m pip install -e .[build]; \
+		$(PYTHON) -m pip install -e .[test]; \
 	fi
 
 test: setup ## Run tests with pytest

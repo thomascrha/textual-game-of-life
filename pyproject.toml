@@ -1,6 +1,6 @@
 [project]
 name = "textual-game-of-life"
-version = "0.7.0"
+version = "0.8.0"
 authors = [
   { name="Thomas Crha", email="thomas@9bitbyte.com" },
 ]

@@ -124,7 +124,7 @@ class CellularAutomatonTui(App[Any]):
         self.push_screen(Help())
 
     def action_about(self) -> None:
-        version = "0.7.0"  # Hardcoded version to match pyproject.toml
+        version = "0.8.0"  # Hardcoded version to match pyproject.toml
         self.push_screen(About(version))
 
     def action_save(self) -> None:

@@ -5,10 +5,9 @@ from typing import Any
 from textual.app import App, ComposeResult
 from textual.binding import Binding, BindingType
 from textual.widgets import Footer
-
-from .canvas import Canvas
-from .modals import Help
 from . import Operation
+from .canvas import Canvas
+from .modals import About, Help
 
 
 class CellularAutomatonTui(App[Any]):
@@ -58,6 +57,7 @@ class CellularAutomatonTui(App[Any]):
         Binding("down", "increase_canvas_vertically", " "),
         Binding("up", "decrease_canvas_vertically", " "),
         Binding("h", "help", "Help"),
+        Binding("i", "about", "About"),
     ]
     canvas: Canvas
 
@@ -122,6 +122,10 @@ class CellularAutomatonTui(App[Any]):
 
     def action_help(self) -> None:
         self.push_screen(Help())
+
+    def action_about(self) -> None:
+        version = "0.6.0"  # Hardcoded version to match pyproject.toml
+        self.push_screen(About(version))
 
     def action_save(self) -> None:
         data = {

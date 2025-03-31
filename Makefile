@@ -19,13 +19,12 @@ random: ## Run the game with random initial state
 	$(PYTHONPATH) $(PYTHON) -m src.textual_game_of_life --random
 
 create_venv: ## Create a virtual environment
-	@if [ ! -d ".venv" ]; then \
-		$(PYTHON) -m venv .venv; \
+	@if [ ! -d "./.venv" ]; then \
+		python -m venv .venv; \
 	fi
 
 setup: create_venv ## Create and activate the virtual environment
-	# check if textual is installed
-	if ! $(PYTHON) -m pip show textual > /dev/null 2>&1; then \
+	@if ! $(PYTHON) -m pip show textual > /dev/null 2>&1; then \
 		$(PYTHON) -m pip install --upgrade pip; \
 		$(PYTHON) -m pip install .; \
 	fi
@@ -39,19 +38,20 @@ run-custom: ## Run with custom parameters (make run-custom W=30 H=30 S=0.3 B=2)
 		$(if $(B),--brush-size=$(B),) \
 		$(if $(L),--load=$(L),)
 
-# Clean up Python cache
-clean: ## Remove Python cache files and build artifacts
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name "*.pyo" -delete
-	find . -type f -name "*.pyd" -delete
-	find . -type f -name ".coverage" -delete
-	find . -type d -name "*.egg-info" -exec rm -rf {} +
-	find . -type d -name "*.egg" -exec rm -rf {} +
-	find . -type d -name ".pytest_cache" -exec rm -rf {} +
-	find . -type d -name ".coverage" -exec rm -rf {} +
-	find . -type d -name "htmlcov" -exec rm -rf {} +
-	find . -type d -name ".tox" -exec rm -rf {} +
-	find . -type d -name "dist" -exec rm -rf {} +
-	find . -type d -name "build" -exec rm -rf {} +
+build: setup ## Build the package (sdist and wheel)
+	# Reinstall pip from scratch to avoid compatibility issues with Python 3.13
+	curl -sS https://bootstrap.pypa.io/get-pip.py | $(PYTHON)
+	$(PYTHON) -m pip install --upgrade build twine setuptools wheel
+	$(PYTHON) -m build
 
+tag-version: ## Tag the current branch with the version from pyproject.toml
+	@VERSION=$$(grep -m 1 'version = ' pyproject.toml | sed 's/version = //;s/"//g'); \
+	echo "Tagging current branch with version v$$VERSION"; \
+	git tag -a "v$$VERSION" -m "Version $$VERSION"; \
+	git push origin "v$$VERSION"; \
+	echo "✓ Tag v$$VERSION created and pushed"
+
+pypi: build tag-version ## Upload the package to PyPI (requires PyPI token)
+	@echo "Uploading to PyPI..."
+	$(PYTHON) -m twine upload dist/*
+	@echo "Package published to PyPI!"

@@ -1,10 +1,55 @@
 from typing import Any
-from typing_extensions import override
-
 from textual.app import ComposeResult
 from textual.containers import Grid
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
+from typing_extensions import override
+
+
+class About(ModalScreen[Any]):
+    DEFAULT_CSS: str = """
+    About {
+        align: center middle;
+    }
+
+    #about-dialog {
+        padding: 1 1;
+        width: 80;
+        height: 30;
+        border: thick $background 80%;
+        background: $surface;
+    }
+
+    #about-close {
+        width: 100%;
+        align: center middle;
+    }
+    """
+
+    def __init__(self, version: str = "0.6.0"):
+        super().__init__()
+        self.version = version
+
+    @override
+    def compose(self) -> ComposeResult:
+        about_text = f"""
+        [b]Textual Game of Life[/b]
+        A Conway's Game of Life implementation in the terminal
+        built with the Textual TUI framework.
+
+        [b]Version:[/b] {self.version}
+        [b]Author:[/b] Thomas Crha
+        [b]GitHub:[/b] https://github.com/thomascrha/textual-game-of-life
+
+        """
+        yield Grid(
+            Static(about_text, id="about-content"),
+            Button("Close", id="about-close"),
+            id="about-dialog",
+        )
+
+    def on_button_pressed(self, _: Button.Pressed) -> None:
+        self.app.pop_screen()
 
 
 class Help(ModalScreen[Any]):
@@ -21,7 +66,7 @@ class Help(ModalScreen[Any]):
         background: $surface;
     }
 
-    Button {
+    #help-close {
         width: 100%;
         align: center middle;
     }
@@ -52,7 +97,7 @@ class Help(ModalScreen[Any]):
     def compose(self) -> ComposeResult:
         yield Grid(
             Static(self.HELP_STRING, id="help"),
-            Button("Close", id="close"),
+            Button("Close", id="help-close"),
             id="help-dialog",
         )
 

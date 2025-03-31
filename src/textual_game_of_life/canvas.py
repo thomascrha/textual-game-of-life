@@ -7,7 +7,6 @@ from textual.geometry import Offset, Region
 from textual.reactive import var
 from textual.strip import Strip
 from textual.widget import Widget
-
 from . import Operation
 
 

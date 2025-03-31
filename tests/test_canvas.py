@@ -48,6 +48,7 @@ def test_get_neighbours(canvas):
     neighbors = canvas.get_neighbours(4, 4)
     assert sum(neighbors) == 2
 
+
 def test_canvas_boundaries(canvas):
     """Test that cells at boundaries interact correctly with wrapping."""
     # Test wrapping at right edge
@@ -55,9 +56,9 @@ def test_canvas_boundaries(canvas):
     max_x = canvas.canvas_width - 1
 
     # Create a pattern at the right edge
-    canvas.toggle_cell(max_x, 5)      # Right edge
+    canvas.toggle_cell(max_x, 5)  # Right edge
     canvas.toggle_cell(max_x - 1, 5)  # One left of edge
-    canvas.toggle_cell(0, 5)          # Left edge (wraps)
+    canvas.toggle_cell(0, 5)  # Left edge (wraps)
 
     # Check that neighbors are correctly counted
     neighbors = canvas.get_neighbours(max_x, 5)
@@ -119,8 +120,8 @@ def test_brush_size_constraints(canvas):
 
 def test_invalid_operation(canvas):
     """Test that invalid operations raise appropriate errors."""
-    from src.textual_game_of_life import Operation
     import pytest
+    from src.textual_game_of_life import Operation
 
     # Create an invalid operation
     class InvalidOp:

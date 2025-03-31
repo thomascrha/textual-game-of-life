@@ -17,4 +17,3 @@ def app():
     # Create and attach canvas attribute for test compatibility
     app.canvas = Canvas(width=10, height=10, speed=0.5)
     return app
-

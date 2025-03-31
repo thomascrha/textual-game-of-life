@@ -65,12 +65,12 @@ def test_modal_resume_animation():
     mock_property = property(lambda self: app_mock)
 
     # Use patch to replace the app property (only once)
-    with patch.object(Help, 'app', mock_property):
+    with patch.object(Help, "app", mock_property):
         # Set was_running flag
         help_modal.was_running = True
 
         # Mock asyncio.create_task
-        with patch('asyncio.create_task') as mock_create_task:
+        with patch("asyncio.create_task") as mock_create_task:
             # Call dismiss_modal
             help_modal.dismiss_modal()
 

@@ -1,7 +1,7 @@
-import os
-import json
 import asyncio
-from unittest.mock import patch, mock_open
+import json
+import os
+from unittest.mock import mock_open, patch
 
 
 def test_tui_initialization(app):
@@ -80,10 +80,10 @@ def test_save_load_game(app, monkeypatch):
     app.canvas.canvas_height = test_data["canvas_height"]
 
     # Mock the open function for save
-    with patch('builtins.open', mock_open()) as mock_file:
+    with patch("builtins.open", mock_open()) as mock_file:
         app.action_save()
         # Check that file was opened for writing
-        mock_file.assert_called_once_with('./save.textual', 'w')
+        mock_file.assert_called_once_with("./save.textual", "w")
         # Don't try to parse JSON directly, just verify the file was opened
         # The actual content verification can be done through other means
 
@@ -93,10 +93,10 @@ def test_save_load_game(app, monkeypatch):
     app.canvas.canvas_height = 10
 
     # Mock file existence check
-    monkeypatch.setattr(os.path, 'exists', lambda path: True)
+    monkeypatch.setattr(os.path, "exists", lambda path: True)
 
     # Mock the open function for load with our test data
-    with patch('builtins.open', mock_open(read_data=json.dumps(test_data))) as mock_file:
+    with patch("builtins.open", mock_open(read_data=json.dumps(test_data))) as mock_file:
         app.action_load()
         # Check that values were loaded
         assert app.canvas.canvas_width == test_data["canvas_width"]
@@ -116,11 +116,11 @@ def test_toggle_animation(app, monkeypatch):
         nonlocal mock_task
         mock_task = coro
 
-    monkeypatch.setattr(asyncio, 'create_task', mock_create_task)
+    monkeypatch.setattr(asyncio, "create_task", mock_create_task)
 
     # Call toggle action
     app.action_toggle()
 
     # Check that create_task was called with canvas.toggle()
     assert mock_task is not None
-    assert mock_task.__name__ == 'toggle'
+    assert mock_task.__name__ == "toggle"

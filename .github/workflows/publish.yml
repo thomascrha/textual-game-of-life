@@ -33,4 +33,3 @@ jobs:
           repository-url: https://upload.pypi.org/legacy/
           packages-dir: dist/
           repository-name: textual-game-of-life
-

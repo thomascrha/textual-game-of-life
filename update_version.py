@@ -4,6 +4,7 @@ import re
 import sys
 from pathlib import Path
 
+
 def validate_version(version):
     """Validate that the version string follows semantic versioning format."""
     pattern = r"^\d+\.\d+\.\d+$"
@@ -11,55 +12,50 @@ def validate_version(version):
         raise ValueError(f"Version must follow format X.Y.Z (e.g., 1.0.0), got {version}")
     return version
 
+
 def update_pyproject_toml(file_path, new_version):
     """Update version in pyproject.toml file."""
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         content = file.read()
 
     # Update version in pyproject.toml - use a function for replacement to avoid backreference issues
     def replace_version(match):
         return f'{match.group(1)}{new_version}"'
 
-    updated_content = re.sub(
-        r'(version\s*=\s*")[^"]+"',
-        replace_version,
-        content
-    )
+    updated_content = re.sub(r'(version\s*=\s*")[^"]+"', replace_version, content)
 
     if content == updated_content:
         print(f"⚠️  No version change detected in {file_path}")
         return False
 
-    with open(file_path, 'w') as file:
+    with open(file_path, "w") as file:
         file.write(updated_content)
 
     print(f"✅ Updated version in {file_path} to {new_version}")
     return True
 
+
 def update_tui_py(file_path, new_version):
     """Update version in tui.py file."""
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         content = file.read()
 
     # Update version in the VERSION class constant - use a function for replacement to avoid backreference issues
     def replace_version(match):
         return f'{match.group(1)}{new_version}"'
 
-    updated_content = re.sub(
-        r'(VERSION\s*=\s*")[^"]+"',
-        replace_version,
-        content
-    )
+    updated_content = re.sub(r'(VERSION\s*=\s*")[^"]+"', replace_version, content)
 
     if content == updated_content:
         print(f"⚠️  No version change detected in {file_path}")
         return False
 
-    with open(file_path, 'w') as file:
+    with open(file_path, "w") as file:
         file.write(updated_content)
 
     print(f"✅ Updated version in {file_path} to {new_version}")
     return True
+
 
 def main():
     parser = argparse.ArgumentParser(description="Update version across project files")
@@ -110,6 +106,6 @@ def main():
 
     return 0
 
+
 if __name__ == "__main__":
     sys.exit(main())
-

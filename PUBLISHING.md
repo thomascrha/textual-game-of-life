@@ -42,4 +42,3 @@ The OIDC integration will be activated after the first successful workflow run. 
   - The package name in `pyproject.toml` matches the PyPI publisher name
 
 For more information, see [PyPI's documentation on trusted publishing](https://docs.pypi.org/trusted-publishers/).
-

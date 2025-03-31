@@ -1,8 +1,8 @@
 import asyncio
 from typing import Any
 from textual.app import ComposeResult
-from textual.containers import Grid
 from textual.binding import Binding
+from textual.containers import Grid
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 from typing_extensions import override
@@ -29,7 +29,6 @@ class About(ModalScreen[Any]):
         align: center middle;
     }
     """
-
 
     def __init__(self, version: str):
         super().__init__()
@@ -61,7 +60,7 @@ class About(ModalScreen[Any]):
 
     def dismiss_modal(self) -> None:
         # Resume animation if it was running before
-        if hasattr(self, 'was_running') and self.was_running:
+        if hasattr(self, "was_running") and self.was_running:
             asyncio.create_task(self.app.canvas.toggle())
         self.app.pop_screen()
 
@@ -125,6 +124,6 @@ class Help(ModalScreen[Any]):
 
     def dismiss_modal(self) -> None:
         # Resume animation if it was running before
-        if hasattr(self, 'was_running') and self.was_running:
+        if hasattr(self, "was_running") and self.was_running:
             asyncio.create_task(self.app.canvas.toggle())
         self.app.pop_screen()

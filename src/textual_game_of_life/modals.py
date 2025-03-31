@@ -26,7 +26,7 @@ class About(ModalScreen[Any]):
     }
     """
 
-    def __init__(self, version: str = "0.6.0"):
+    def __init__(self, version: str = "0.7.0"):
         super().__init__()
         self.version = version
 

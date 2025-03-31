@@ -61,7 +61,7 @@ class Canvas(Widget):
         self.canvas_height = height
         self.refresh_interval = speed
         self.brush_size = max(min(brush_size, self.MAX_BRUSH_SIZE), self.MIN_BRUSH_SIZE)
-        self.mouse_captured = False
+        self.mouse_captured = True
 
         self.matrix: list[list[int]] = [
             [0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)

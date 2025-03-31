@@ -123,10 +123,22 @@ class CellularAutomatonTui(App[Any]):
         self.canvas.random()
 
     def action_help(self) -> None:
-        self.push_screen(Help())
+        # Pause animation if running when opening help screen
+        was_running = self.canvas.running
+        if was_running:
+            asyncio.create_task(self.canvas.toggle())
+        help_screen = Help()
+        help_screen.was_running = was_running
+        self.push_screen(help_screen)
 
     def action_about(self) -> None:
-        self.push_screen(About(self.VERSION))
+        # Pause animation if running when opening about screen
+        was_running = self.canvas.running
+        if was_running:
+            asyncio.create_task(self.canvas.toggle())
+        about_screen = About(self.VERSION)
+        about_screen.was_running = was_running
+        self.push_screen(about_screen)
 
     def action_save(self) -> None:
         data = {

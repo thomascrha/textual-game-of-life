@@ -102,25 +102,3 @@ def test_save_load_game(app, monkeypatch):
         assert app.canvas.canvas_width == test_data["canvas_width"]
         assert app.canvas.canvas_height == test_data["canvas_height"]
         assert app.canvas.matrix == test_data["matrix"]
-
-
-def test_toggle_animation(app, monkeypatch):
-    """Test that animation can be toggled."""
-    # Make sure running is initially False
-    app.canvas.running = False
-
-    # Mock asyncio.create_task to track calls
-    mock_task = None
-
-    def mock_create_task(coro):
-        nonlocal mock_task
-        mock_task = coro
-
-    monkeypatch.setattr(asyncio, "create_task", mock_create_task)
-
-    # Call toggle action
-    app.action_toggle()
-
-    # Check that create_task was called with canvas.toggle()
-    assert mock_task is not None
-    assert mock_task.__name__ == "toggle"

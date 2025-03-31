@@ -1,16 +1,15 @@
 import asyncio
-from typing import Any
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
-from typing_extensions import override
+from typing_extensions import final, override
 
 
-class About(ModalScreen[Any]):
+@final
+class About(ModalScreen[None]):
     BINDINGS = [Binding("escape", "pop_screen", "Close")]
-
     DEFAULT_CSS: str = """
     About {
         align: center middle;
@@ -29,6 +28,7 @@ class About(ModalScreen[Any]):
         align: center middle;
     }
     """
+    was_running: bool = False
 
     def __init__(self, version: str):
         super().__init__()
@@ -59,13 +59,17 @@ class About(ModalScreen[Any]):
         self.dismiss_modal()
 
     def dismiss_modal(self) -> None:
-        # Resume animation if it was running before
-        if hasattr(self, "was_running") and self.was_running:
-            asyncio.create_task(self.app.canvas.toggle())
-        self.app.pop_screen()
+        if self.was_running:
+            try:
+                _ = asyncio.create_task(self.app.canvas.toggle())
+            except RuntimeError:
+                # No running event loop (likely in test environment)
+                self.app.canvas.running = not self.app.canvas.running
+        _ = self.app.pop_screen()
 
 
-class Help(ModalScreen[Any]):
+@final
+class Help(ModalScreen[None]):
     BINDINGS = [Binding("escape", "pop_screen", "Close")]
 
     DEFAULT_CSS: str = """
@@ -111,6 +115,8 @@ class Help(ModalScreen[Any]):
     [b]H[/b] - Help
     """
 
+    was_running: bool = False
+
     @override
     def compose(self) -> ComposeResult:
         yield Grid(
@@ -126,7 +132,10 @@ class Help(ModalScreen[Any]):
         self.dismiss_modal()
 
     def dismiss_modal(self) -> None:
-        # Resume animation if it was running before
-        if hasattr(self, "was_running") and self.was_running:
-            asyncio.create_task(self.app.canvas.toggle())
-        self.app.pop_screen()
+        if self.was_running:
+            try:
+                _ = asyncio.create_task(self.app.canvas.toggle())
+            except RuntimeError:
+                # No running event loop (likely in test environment)
+                self.app.canvas.running = not self.app.canvas.running
+        _ = self.app.pop_screen()

@@ -40,6 +40,7 @@ run-custom: ## Run with custom parameters (make run-custom W=30 H=30 S=0.3 B=2)
 
 build: setup ## Build the package (sdist and wheel)
 	# Reinstall pip from scratch to avoid compatibility issues with Python 3.13
+	rm -rf build dist .egg-info
 	curl -sS https://bootstrap.pypa.io/get-pip.py | $(PYTHON)
 	$(PYTHON) -m pip install --upgrade build twine setuptools wheel
 	$(PYTHON) -m build

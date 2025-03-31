@@ -1,6 +1,6 @@
 [project]
-name = "textual-game-of-life-github"
-version = "0.9.0"
+name = "textual-game-of-life"
+version = "0.10.0"
 authors = [
   { name="Thomas Crha", email="thomas@9bitbyte.com" },
 ]

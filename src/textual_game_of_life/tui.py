@@ -40,6 +40,8 @@ class CellularAutomatonTui(App[Any]):
         self.load_file = load_file
         self.random_start = random_start
 
+    VERSION = "0.10.0"  # Hardcoded version to match pyproject.toml
+
     BINDINGS: list[BindingType] = [
         Binding("s", "step", "Step"),
         Binding("t", "toggle", "Toggle"),
@@ -124,8 +126,7 @@ class CellularAutomatonTui(App[Any]):
         self.push_screen(Help())
 
     def action_about(self) -> None:
-        version = "0.9.0"  # Hardcoded version to match pyproject.toml
-        self.push_screen(About(version))
+        self.push_screen(About(self.VERSION))
 
     def action_save(self) -> None:
         data = {

@@ -52,11 +52,11 @@ tag-version: ## Tag the current branch with the version from pyproject.toml
 	git push origin "v$$VERSION"; \
 	echo "✓ Tag v$$VERSION created and pushed"
 
-pypi-manual: build tag-version ## Upload the package to PyPI (requires PyPI token)
+pypi-manual: build tag-version ## Build, Tag and Upload the package to PyPI (requires PyPI token)
 	@echo "Uploading to PyPI..."
 	$(PYTHON) -m twine upload dist/*
 	@echo "Package published to PyPI!"
 
-pypi: build tag-version ## Build, tag, and trigger GitHub Actions to publish to PyPI
+pypi: tag-version ## Tag and trigger GitHub Actions to publish to PyPI
 	@echo "Tagged version pushed. GitHub Actions will publish to PyPI automatically."
 	@echo "Check the Actions tab in your repository for progress."

@@ -1,8 +1,9 @@
 import asyncio
 import json
 import os
+from typing import Any
 from textual.app import App, ComposeResult
-from textual.binding import Binding
+from textual.binding import Binding, BindingType
 from textual.widgets import Footer
 
 from .canvas import Canvas
@@ -10,8 +11,37 @@ from .modals import Help
 from . import Operation
 
 
-class CellularAutomatonTui(App):
-    BINDINGS = [
+class CellularAutomatonTui(App[Any]):
+    """Conway's Game of Life TUI application."""
+
+    def __init__(
+        self,
+        width: int = 20,
+        height: int = 20,
+        speed: float = 0.5,
+        brush_size: int = 1,
+        load_file: str = None,
+        random_start: bool = False,
+    ) -> None:
+        """Initialize the application with optional configuration.
+
+        Args:
+            width: Initial canvas width
+            height: Initial canvas height
+            speed: Simulation speed (lower is faster)
+            brush_size: Initial brush size
+            load_file: Path to a saved game state file to load
+            random_start: Whether to start with a random pattern
+        """
+        super().__init__()
+        self.initial_width = width
+        self.initial_height = height
+        self.initial_speed = speed
+        self.initial_brush_size = brush_size
+        self.load_file = load_file
+        self.random_start = random_start
+
+    BINDINGS: list[BindingType] = [
         Binding("s", "step", "Step"),
         Binding("t", "toggle", "Toggle"),
         Binding("+", "increase_canvas", "Larger"),
@@ -29,11 +59,27 @@ class CellularAutomatonTui(App):
         Binding("up", "decrease_canvas_vertically", " "),
         Binding("h", "help", "Help"),
     ]
+    canvas: Canvas
 
     def compose(self) -> ComposeResult:
-        self.canvas = Canvas()
+        self.canvas = Canvas(
+            width=self.initial_width,
+            height=self.initial_height,
+            speed=self.initial_speed,
+            brush_size=self.initial_brush_size,
+        )
         yield self.canvas
         yield Footer()
+
+    def on_mount(self) -> None:
+        """Called when app is mounted."""
+        # Handle initial loading if specified
+        if self.load_file:
+            self._load_from_file(self.load_file)
+
+        # Initialize with random pattern if requested
+        if self.random_start:
+            self.canvas.random()
 
     def action_quit(self) -> None:
         exit()
@@ -60,10 +106,10 @@ class CellularAutomatonTui(App):
         asyncio.create_task(self.canvas.toggle())
 
     def action_increase_speed(self) -> None:
-        self.canvas.REFRESH_INTERVAL -= 0.1
+        self.canvas.refresh_interval -= 0.1
 
     def action_decrease_speed(self) -> None:
-        self.canvas.REFRESH_INTERVAL += 0.1
+        self.canvas.refresh_interval += 0.1
 
     def action_clear(self) -> None:
         self.canvas.clear()
@@ -80,8 +126,8 @@ class CellularAutomatonTui(App):
     def action_save(self) -> None:
         data = {
             "matrix": self.canvas.matrix,
-            "canvas_width": self.canvas.CANVAS_WIDTH,
-            "canvas_height": self.canvas.CANVAS_HEIGHT,
+            "canvas_width": self.canvas.canvas_width,
+            "canvas_height": self.canvas.canvas_height,
         }
         with open("./save.textual", "w") as save_file:
             json.dump(data, save_file)
@@ -94,10 +140,8 @@ class CellularAutomatonTui(App):
             data = json.load(load_file)
             self.canvas.matrix = data.get(
                 "matrix",
-                [[0 for _ in range(self.canvas.CANVAS_WIDTH + 1)] for _ in range(self.canvas.CANVAS_HEIGHT + 1)],
+                [[0 for _ in range(self.canvas.canvas_width + 1)] for _ in range(self.canvas.canvas_height + 1)],
             )
-            self.canvas.CANVAS_WIDTH = data.get("canvas_width", self.canvas.CANVAS_WIDTH)
-            self.canvas.CANVAS_HEIGHT = data.get("canvas_height", self.canvas.CANVAS_HEIGHT)
+            self.canvas.canvas_width = data.get("canvas_width", self.canvas.canvas_width)
+            self.canvas.canvas_height = data.get("canvas_height", self.canvas.canvas_height)
             self.canvas.refresh()
-
-

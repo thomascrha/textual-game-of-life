@@ -1,11 +1,14 @@
+from typing import Any
+from typing_extensions import override
+
 from textual.app import ComposeResult
 from textual.containers import Grid
 from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
 
-class Help(ModalScreen):
-    DEFAULT_CSS = """
+class Help(ModalScreen[Any]):
+    DEFAULT_CSS: str = """
     Help {
         align: center middle;
     }
@@ -23,7 +26,7 @@ class Help(ModalScreen):
         align: center middle;
     }
     """
-    HELP_STRING = """
+    HELP_STRING: str = """
 
     [b]Help[/b]
 
@@ -31,6 +34,10 @@ class Help(ModalScreen):
     [b]T[/b] - Toggle auto step
     [b]+[/b] - Increse the size of the canvas
     [b]-[/b] - Decrease the size of the canvas
+    [b]F[/b] - Faster simulation
+    [b]L[/b] - Slower simulation
+    [b]A[/b] - Save game state
+    [b]O[/b] - Load game state
     [b]R[/b] - Random canvas
     [b]C[/b] - Clear canvas
     [b]Q[/b] - Quit
@@ -41,6 +48,7 @@ class Help(ModalScreen):
     [b]H[/b] - Help
     """
 
+    @override
     def compose(self) -> ComposeResult:
         yield Grid(
             Static(self.HELP_STRING, id="help"),

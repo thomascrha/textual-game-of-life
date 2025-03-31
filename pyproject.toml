@@ -1,6 +1,6 @@
 [project]
 name = "textual-game-of-life"
-version = "0.4.0"
+version = "0.5.0"
 authors = [
   { name="Thomas Crha", email="thomas@9bitbyte.com" },
 ]
@@ -14,17 +14,18 @@ classifiers = [
 ]
 
 dependencies = [
-    "importlib-metadata==6.8.0",
-    "linkify-it-py==2.0.2",
+    "importlib_metadata==8.6.1",
+    "linkify-it-py==2.0.3",
     "markdown-it-py==3.0.0",
-    "mdit-py-plugins==0.4.0",
+    "mdit-py-plugins==0.4.2",
     "mdurl==0.1.2",
-    "Pygments==2.16.1",
-    "rich==13.5.2",
-    "textual==0.35.1",
-    "typing_extensions==4.7.1",
-    "uc-micro-py==1.0.2",
-    "zipp==3.16.2",
+    "platformdirs==4.3.7",
+    "Pygments==2.19.1",
+    "rich==14.0.0",
+    "textual==3.0.0",
+    "typing_extensions==4.13.0",
+    "uc-micro-py==1.0.3",
+    "zipp==3.21.0",
 ]
 
 [project.scripts]

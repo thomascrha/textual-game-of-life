@@ -1,6 +1,5 @@
 import asyncio
 import random
-from typing import List
 from rich.segment import Segment
 from rich.style import Style
 from textual import events
@@ -13,7 +12,7 @@ from . import Operation
 
 
 class Canvas(Widget):
-    COMPONENT_CLASSES: set = {
+    COMPONENT_CLASSES: set[str] = {
         "canvas--white-square",
         "canvas--black-square",
         "canvas--cursor-square-white",
@@ -35,30 +34,42 @@ class Canvas(Widget):
     }
     """
     ROW_HEIGHT: int = 2
-    CANVAS_HEIGHT: int = 20
-    CANVAS_WIDTH: int = 20
 
     CANVAS_OFFSET: int = 2
 
-    REFRESH_INTERVAL: float = 0.5
+    refresh_interval: float = 0.5
 
     MAX_CANVAS_HEIGHT: int = 100
     MAX_CANVAS_WIDTH: int = 100
 
-    cursor_square = var(Offset(0, 0))
+    # Brush size settings
+    brush_size: int = 1
+    MAX_BRUSH_SIZE: int = 10
+    MIN_BRUSH_SIZE: int = 1
+
+    canvas_height: int = 20
+    canvas_width: int = 20
+    cursor_square: var[Offset] = var(Offset(0, 0))
     running: bool = False
     x: int = -1
     y: int = -1
-    cursor_colour = "black"
+    cursor_colour: str = "black"
 
-    def __init__(self) -> None:
+    def __init__(self, width: int = 20, height: int = 20, speed: float = 0.5, brush_size: int = 1) -> None:
         super().__init__()
-        self.matrix: List[List[int]] = [
-            [0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)
+
+        self.canvas_width = width
+        self.canvas_height = height
+        self.refresh_interval = speed
+        self.brush_size = max(min(brush_size, self.MAX_BRUSH_SIZE), self.MIN_BRUSH_SIZE)
+        self.mouse_captured = False
+
+        self.matrix: list[list[int]] = [
+            [0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)
         ]
 
     def clear(self) -> None:
-        self.matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+        self.matrix = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
         self.refresh()
 
     # step methods
@@ -69,7 +80,7 @@ class Canvas(Widget):
     async def toggle(self):
         self.running = not self.running
         while self.running:
-            await asyncio.sleep(self.REFRESH_INTERVAL)
+            await asyncio.sleep(self.refresh_interval)
             self.step()
 
     def get_neighbours(self, x: int, y: int) -> list[int]:
@@ -78,13 +89,13 @@ class Canvas(Widget):
             for j in range(-1, 2):
                 if i == j == 0:
                     continue
-                neighbours.append(self.matrix[(y + i) % self.CANVAS_HEIGHT][(x + j) % self.CANVAS_WIDTH])
+                neighbours.append(self.matrix[(y + i) % self.canvas_height][(x + j) % self.canvas_width])
         return neighbours
 
     def get_next_generation(self) -> list[list[int]]:
-        new_canvas_matrix = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
-        for y in range(self.CANVAS_HEIGHT):
-            for x in range(self.CANVAS_WIDTH):
+        new_canvas_matrix = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
+        for y in range(self.canvas_height):
+            for x in range(self.canvas_width):
                 neighbours = self.get_neighbours(x, y)
                 if self.matrix[y][x] == 1:
                     if 2 <= sum(neighbours) <= 3:
@@ -95,13 +106,13 @@ class Canvas(Widget):
         return new_canvas_matrix
 
     def random(self) -> None:
-        for y in range(self.CANVAS_HEIGHT):
-            for x in range(self.CANVAS_WIDTH):
+        for y in range(self.canvas_height):
+            for x in range(self.canvas_width):
                 self.matrix[y][x] = random.randint(0, 1)
         self.refresh()
 
-    def extend_canvas(self) -> List[List[int]]:
-        matirx = [[0 for _ in range(self.CANVAS_WIDTH + 1)] for _ in range(self.CANVAS_HEIGHT + 1)]
+    def extend_canvas(self) -> list[list[int]]:
+        matirx = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
         for y, _ in enumerate(self.matrix):
             for x, value in enumerate(self.matrix[y]):
                 if len(matirx) > y and len(matirx[y]) > x:
@@ -116,29 +127,29 @@ class Canvas(Widget):
 
         if horizontally:
             if operation.value == "increase":
-                if self.CANVAS_WIDTH >= self.MAX_CANVAS_WIDTH:
+                if self.canvas_width >= self.MAX_CANVAS_WIDTH:
                     return
 
-                self.CANVAS_WIDTH += amount
+                self.canvas_width += amount
             elif operation.value == "decrease":
-                if self.CANVAS_WIDTH <= 10:
+                if self.canvas_width <= 10:
                     return
 
-                self.CANVAS_WIDTH -= amount
+                self.canvas_width -= amount
             else:
                 raise RuntimeError(f"Invalid operation: {operation}")
 
         if vertically:
             if operation.value == "increase":
-                if self.CANVAS_HEIGHT >= self.MAX_CANVAS_HEIGHT:
+                if self.canvas_height >= self.MAX_CANVAS_HEIGHT:
                     return
 
-                self.CANVAS_HEIGHT += amount
+                self.canvas_height += amount
             elif operation.value == "decrease":
-                if self.CANVAS_HEIGHT <= 10:
+                if self.canvas_height <= 10:
                     return
 
-                self.CANVAS_HEIGHT -= amount
+                self.canvas_height -= amount
             else:
                 raise RuntimeError(f"Invalid operation: {operation}")
 
@@ -159,17 +170,32 @@ class Canvas(Widget):
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
         mouse_position = event.offset + self.scroll_offset
-        self.cursor_square = Offset(
+        current_cursor = Offset(
             mouse_position.x // self.ROW_HEIGHT,
             mouse_position.y // int(self.ROW_HEIGHT / 2),
         )
 
-        # only update the scauare that aren't out of range
+        # If the cursor position has changed
+        if current_cursor != self.cursor_square:
+            self.cursor_square = current_cursor
+
+            # If mouse is captured (dragging), toggle cells
+            if self.mouse_captured and event.button == 1:  # Left mouse button
+                self.toggle_cell(self.cursor_square.x, self.cursor_square.y)
+
+        # only update the square that aren't out of range
         self.cursor_colour = "black"
         if len(self.matrix) > self.cursor_square.y and len(self.matrix[self.cursor_square.y]) > self.cursor_square.x:
             self.cursor_colour = "black" if self.matrix[self.cursor_square.y][self.cursor_square.x] == 0 else "white"
 
+    def toggle_cell(self, x: int, y: int) -> None:
+        """Toggle the state of a cell at the given coordinates."""
+        if len(self.matrix) > y and len(self.matrix[y]) > x:
+            self.matrix[y][x] ^= 1
+            self.refresh(self.get_square_region(Offset(x, y)))
+
     def on_click(self, event: events.Click) -> None:
+        """Called when the mouse is clicked."""
         mouse_position = event.offset + self.scroll_offset
         self.cursor_square = Offset(
             mouse_position.x // self.ROW_HEIGHT,
@@ -179,10 +205,11 @@ class Canvas(Widget):
         self.y = self.cursor_square.y
 
         # toggle the square
-        if len(self.matrix) > self.y and len(self.matrix[self.y]) > self.x:
-            self.matrix[self.y][self.x] ^= 1
+        self.toggle_cell(self.x, self.y)
 
-        self.refresh(self.get_square_region(self.cursor_square))
+        # Start tracking the drag
+        self.capture_mouse()
+        self.mouse_captured = True
 
     def get_square_region(self, square_offset: Offset) -> Region:
         """Get region relative to widget from square coordinate."""
@@ -205,11 +232,26 @@ class Canvas(Widget):
         # Refresh the new cursor square
         self.refresh(self.get_square_region(cursor_square))
 
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        """Called when the mouse button is released."""
+        self.release_mouse()
+        self.mouse_captured = False
+
+    def increase_brush_size(self) -> None:
+        """Increase the brush size, respecting the maximum limit."""
+        if self.brush_size < self.MAX_BRUSH_SIZE:
+            self.brush_size += 1
+
+    def decrease_brush_size(self) -> None:
+        """Decrease the brush size, respecting the minimum limit."""
+        if self.brush_size > self.MIN_BRUSH_SIZE:
+            self.brush_size -= 1
+
     def render_line(self, y: int) -> Strip:
         """Render a line of the widget. y is relative to the top of the widget."""
         row_index = y // int(self.ROW_HEIGHT / 2)
 
-        if row_index >= self.CANVAS_HEIGHT:
+        if row_index >= self.canvas_height:
             return Strip.blank(self.size.width)
 
         def get_square_style(column: int, row: int) -> Style:
@@ -225,7 +267,7 @@ class Canvas(Widget):
             return square_style
 
         segments = [
-            Segment(" " * self.ROW_HEIGHT, get_square_style(column, row_index)) for column in range(self.CANVAS_WIDTH)
+            Segment(" " * self.ROW_HEIGHT, get_square_style(column, row_index)) for column in range(self.canvas_width)
         ]
         strip = Strip(segments)
         return strip

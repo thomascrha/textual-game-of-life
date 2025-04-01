@@ -89,9 +89,9 @@ def test_alter_canvas_size_constraints(canvas):
     canvas.alter_canvas_size(Operation.INCREASE, amount=1000)
 
     # Size should be limited to maximum
-    # Note: MAX_CANVAS_WIDTH appears to be 1010 now
-    assert canvas.canvas_width == 1010
-    assert canvas.canvas_height == 1010
+    # Canvas MAX_CANVAS_WIDTH is 100
+    assert canvas.canvas_width == 100
+    assert canvas.canvas_height == 100
 
 
 def test_brush_size_constraints(canvas):

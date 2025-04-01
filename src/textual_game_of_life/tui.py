@@ -2,9 +2,11 @@ import asyncio
 import json
 import numpy as np
 import os
+import time
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer
+from typing import Optional
 from typing_extensions import final, override
 from . import Operation
 from .canvas import Canvas
@@ -69,10 +71,17 @@ class CellularAutomatonTui(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Update the max size constraints after mounting
+        self.canvas.update_size_constraints()
+
         if self.random_start:
             self.canvas.random()
         if self.load_file:
             self._load_from_file(self.load_file)
+
+    def on_canvas_message_request(self, event: Canvas.MessageRequest) -> None:
+        """Handle message requests from the canvas."""
+        self.display_message(event.message, event.timeout)
 
     @override
     async def action_quit(self) -> None:
@@ -152,13 +161,39 @@ class CellularAutomatonTui(App[None]):
         self.display_message("Random pulsar added", 1.0)
 
     def display_message(self, text: str, timeout: float = 3.0) -> None:
-        """Display a temporary message on the canvas.
+        # Show message on the canvas
+        self.canvas.message = text
+        self.canvas.message_visible = True
+        self.canvas.message_timestamp = time.time()
+        self.canvas.message_timeout = timeout
+        _ = self.canvas.refresh()  # Force refresh to show the message
 
-        Args:
-            text: The message to display
-            timeout: How long to show the message in seconds
-        """
-        self.canvas.display_message(text, timeout)
+        # Schedule the message removal
+        if self.canvas.message_task and not self.canvas.message_task.done():
+            _ = self.canvas.message_task.cancel()
+
+        try:
+            # Create and store the task for auto-timeout
+            self.canvas.message_task = asyncio.create_task(self._message_timeout_task(timeout))
+        except RuntimeError:
+            # No running event loop (likely in test environment)
+            # For test environments, just mark message as not visible after timeout
+            self.canvas.message_visible = False
+
+    async def _message_timeout_task(self, timeout: float) -> None:
+        """Task to automatically hide messages after the timeout."""
+        try:
+            await asyncio.sleep(timeout)
+            if self.canvas.message_visible:
+                self.canvas.message_visible = False
+                try:
+                    _ = self.canvas.refresh()
+                except Exception:
+                    # Handle potential errors in test environments
+                    pass
+        except asyncio.CancelledError:
+            # Task was cancelled, likely because a new message is being displayed
+            pass
 
     def action_help(self) -> None:
         # Pause animation if running when opening help screen

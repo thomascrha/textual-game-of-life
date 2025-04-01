@@ -6,6 +6,7 @@ from rich.segment import Segment
 from rich.style import Style
 from textual import events
 from textual.geometry import Offset, Region
+from textual.message import Message
 from textual.reactive import var
 from textual.strip import Strip
 from textual.widget import Widget
@@ -14,6 +15,14 @@ from . import Operation
 
 
 class Canvas(Widget):
+    class MessageRequest(Message):
+        """Message sent when the canvas wants to display a notification."""
+
+        def __init__(self, message: str, timeout: float = 2.0) -> None:
+            self.message = message
+            self.timeout = timeout
+            super().__init__()
+
     COMPONENT_CLASSES: set[str] = {
         "canvas--white-square",
         "canvas--black-square",
@@ -74,6 +83,12 @@ class Canvas(Widget):
         self.brush_size = max(min(brush_size, self.MAX_BRUSH_SIZE), self.MIN_BRUSH_SIZE)
         self.mouse_captured: bool = True
 
+        # Precomputed max size constraints
+        self.max_width_by_term = 0
+        self.max_height_by_term = 0
+        self.effective_max_width = 0  # Min of terminal constraint and MAX_CANVAS_WIDTH
+        self.effective_max_height = 0  # Min of terminal constraint and MAX_CANVAS_HEIGHT
+
         self.matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
 
         self.message = ""
@@ -82,25 +97,21 @@ class Canvas(Widget):
         self.message_timeout = 3.0  # Default timeout in seconds
         self.message_task = None
 
-    def display_message(self, text: str, timeout: float = 3.0) -> None:
-        if self.message_task and not self.message_task.done():
-            _ = self.message_task.cancel()
-
-        self.message = text
-        self.message_visible = True
-        self.message_timestamp = time.time()
-        self.message_timeout = timeout
-        _ = self.refresh()  # Force refresh to show the message
-
-        # Schedule the message removal and track the task
+    def request_message(self, text: str, timeout: float = 2.0) -> None:
+        """Request that a message be displayed by the parent application."""
         try:
-            # Create and store the task for auto-timeout
-            self.message_task = asyncio.create_task(self._message_timeout_task())
-        except RuntimeError:
-            # No running event loop (likely in test environment)
-            # For test environments, just mark message as not visible after timeout
-            # to avoid the unawaited coroutine warning
-            self.message_visible = False
+            self.post_message(self.MessageRequest(text, timeout))
+        except Exception:
+            # In test environments or when no parent is available,
+            # just set the message locally without posting
+            self.message = text
+            self.message_visible = True
+            self.message_timestamp = time.time()
+            self.message_timeout = timeout
+
+    def display_message(self, text: str, timeout: float = 3.0) -> None:
+        """Legacy method - now routes to request_message for compatibility."""
+        self.request_message(text, timeout)
 
     async def _message_timeout_task(self) -> None:
         try:
@@ -316,9 +327,59 @@ class Canvas(Widget):
         new_matrix[:copy_height, :copy_width] = self.matrix[:copy_height, :copy_width]
         return new_matrix
 
+    def update_size_constraints(self) -> None:
+        """Update the maximum size constraints based on current terminal size."""
+        # Get current terminal size
+        term_width, term_height = self.size.width, self.size.height
+
+        # Calculate max possible canvas dimensions based on terminal size
+        # Each canvas cell takes ROW_HEIGHT horizontal characters and ROW_HEIGHT/2 vertical characters
+        self.max_width_by_term = term_width // self.ROW_HEIGHT
+        self.max_height_by_term = term_height // int(self.ROW_HEIGHT / 2)
+
+        # Account for margins and UI elements
+        self.max_width_by_term = max(10, self.max_width_by_term - 2)  # Subtract margins
+        self.max_height_by_term = max(10, self.max_height_by_term - 2)  # Subtract margins
+
+        # Maximum canvas size can't exceed terminal size or hard-coded maximums
+        self.effective_max_width = min(self.max_width_by_term, self.MAX_CANVAS_WIDTH)
+        self.effective_max_height = min(self.max_height_by_term, self.MAX_CANVAS_HEIGHT)
+
+    def on_resize(self, event) -> None:
+        """Handle terminal resize events."""
+        # Update constraints when terminal resizes
+        self.update_size_constraints()
+
+        # If current canvas size exceeds new constraints, resize it
+        if self.canvas_width > self.effective_max_width or self.canvas_height > self.effective_max_height:
+            size_limited = False
+
+            if self.canvas_width > self.effective_max_width:
+                self.canvas_width = self.effective_max_width
+                # Determine which limit we hit
+                if self.max_width_by_term < self.MAX_CANVAS_WIDTH:
+                    self.request_message(f"Canvas width adjusted to fit terminal ({self.max_width_by_term} cells)", 2.0)
+                else:
+                    self.request_message(f"Canvas width adjusted to maximum ({self.MAX_CANVAS_WIDTH} cells)", 2.0)
+                size_limited = True
+
+            if self.canvas_height > self.effective_max_height:
+                self.canvas_height = self.effective_max_height
+                # Determine which limit we hit
+                if self.max_height_by_term < self.MAX_CANVAS_HEIGHT:
+                    self.request_message(f"Canvas height adjusted to fit terminal ({self.max_height_by_term} cells)", 2.0)
+                else:
+                    self.request_message(f"Canvas height adjusted to maximum ({self.MAX_CANVAS_HEIGHT} cells)", 2.0)
+                size_limited = True
+
+            if size_limited:
+                self.matrix = self.extend_canvas()
+                _ = self.refresh()
+
     def alter_canvas_size(
         self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
     ) -> None:
+        """Alter the size of the canvas."""
         if self.running:
             try:
                 _ = asyncio.create_task(self.toggle())
@@ -326,36 +387,75 @@ class Canvas(Widget):
                 # No running event loop (likely in test environment)
                 self.running = not self.running
 
+        # Always set constraints for test environments
+        self.max_width_by_term = self.MAX_CANVAS_WIDTH
+        self.max_height_by_term = self.MAX_CANVAS_HEIGHT
+        self.effective_max_width = self.MAX_CANVAS_WIDTH
+        self.effective_max_height = self.MAX_CANVAS_HEIGHT
+
+        # In a real terminal, this would get updated based on terminal size
+        if hasattr(self, 'size') and self.size:
+            self.update_size_constraints()
+
+        size_limited = False
+        limit_reason = ""
+
         if horizontally:
             if operation.value == "increase":
-                if self.canvas_width >= self.MAX_CANVAS_WIDTH:
-                    return
-
-                self.canvas_width += amount
+                # Check if we'd exceed the maximum
+                if self.canvas_width >= self.effective_max_width:
+                    # Determine which limit we hit
+                    if self.max_width_by_term < self.MAX_CANVAS_WIDTH:
+                        limit_reason = f"terminal width ({self.max_width_by_term} cells)"
+                    else:
+                        limit_reason = f"maximum width ({self.MAX_CANVAS_WIDTH} cells)"
+                    size_limited = True
+                    # Set to the maximum allowed size
+                    self.canvas_width = self.effective_max_width
+                else:
+                    # Increase the width, capped at the maximum
+                    new_width = min(self.canvas_width + amount, self.effective_max_width)
+                    self.canvas_width = new_width
             elif operation.value == "decrease":
                 if self.canvas_width <= 10:
+                    self.request_message(f"Minimum canvas width reached (10 cells)", 2.0)
                     return
-
                 self.canvas_width -= amount
             else:
                 raise RuntimeError(f"Invalid operation: {operation}")
 
         if vertically:
             if operation.value == "increase":
-                if self.canvas_height >= self.MAX_CANVAS_HEIGHT:
-                    return
-
-                self.canvas_height += amount
+                if self.canvas_height >= self.effective_max_height:
+                    # Determine which limit we hit (if not already set)
+                    if not limit_reason:
+                        if self.max_height_by_term < self.MAX_CANVAS_HEIGHT:
+                            limit_reason = f"terminal height ({self.max_height_by_term} cells)"
+                        else:
+                            limit_reason = f"maximum height ({self.MAX_CANVAS_HEIGHT} cells)"
+                    size_limited = True
+                    # Set to the maximum allowed size
+                    self.canvas_height = self.effective_max_height
+                else:
+                    # Increase the height, capped at the maximum
+                    new_height = min(self.canvas_height + amount, self.effective_max_height)
+                    self.canvas_height = new_height
             elif operation.value == "decrease":
                 if self.canvas_height <= 10:
+                    self.request_message(f"Minimum canvas height reached (10 cells)", 2.0)
                     return
-
                 self.canvas_height -= amount
             else:
                 raise RuntimeError(f"Invalid operation: {operation}")
 
+        # Always extend the canvas matrix regardless of whether we hit a limit
+        # This ensures the matrix is always the right size for the current dimensions
         self.matrix = self.extend_canvas()
         _ = self.refresh()
+
+        if size_limited:
+            # Display message about which limit was reached
+            self.request_message(f"Canvas size limited by {limit_reason}", 2.0)
 
     @property
     def white(self) -> Style:

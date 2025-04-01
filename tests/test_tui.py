@@ -1,8 +1,7 @@
 import json
-import numpy as np
 import os
-
 from unittest.mock import mock_open, patch
+import numpy as np
 
 
 def test_tui_initialization(app):

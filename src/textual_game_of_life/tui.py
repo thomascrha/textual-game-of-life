@@ -1,12 +1,11 @@
 import asyncio
 import json
-import numpy as np
 import os
 import time
+import numpy as np
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer
-from typing import Optional
 from typing_extensions import final, override
 from . import Operation
 from .canvas import Canvas
@@ -15,7 +14,7 @@ from .modals import About, Help
 
 @final
 class CellularAutomatonTui(App[None]):
-    VERSION = "1.1.0"  # Hardcoded version to match pyproject.toml
+    VERSION = "1.2.0"  # Hardcoded version to match pyproject.toml
 
     # Extend parent bindings rather than replace them
     BINDINGS = [
@@ -71,7 +70,6 @@ class CellularAutomatonTui(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        # Update the max size constraints after mounting
         self.canvas.update_size_constraints()
 
         if self.random_start:
@@ -80,7 +78,6 @@ class CellularAutomatonTui(App[None]):
             self._load_from_file(self.load_file)
 
     def on_canvas_message_request(self, event: Canvas.MessageRequest) -> None:
-        """Handle message requests from the canvas."""
         self.display_message(event.message, event.timeout)
 
     @override
@@ -127,7 +124,6 @@ class CellularAutomatonTui(App[None]):
         self.display_message(status, 1.0)
 
     def action_increase_speed(self) -> None:
-        # Ensure we don't go below the minimum threshold of 0.1
         if self.canvas.refresh_interval <= 0.2:
             self.canvas.refresh_interval = 0.1  # Set to exact minimum
             self.display_message("Speed is at maximum (0.1s per step)", 1.0)
@@ -161,7 +157,6 @@ class CellularAutomatonTui(App[None]):
         self.display_message("Random pulsar added", 1.0)
 
     def display_message(self, text: str, timeout: float = 3.0) -> None:
-        # Show message on the canvas
         self.canvas.message = text
         self.canvas.message_visible = True
         self.canvas.message_timestamp = time.time()
@@ -181,7 +176,6 @@ class CellularAutomatonTui(App[None]):
             self.canvas.message_visible = False
 
     async def _message_timeout_task(self, timeout: float) -> None:
-        """Task to automatically hide messages after the timeout."""
         try:
             await asyncio.sleep(timeout)
             if self.canvas.message_visible:
@@ -196,7 +190,6 @@ class CellularAutomatonTui(App[None]):
             pass
 
     def action_help(self) -> None:
-        # Pause animation if running when opening help screen
         was_running = self.canvas.running
         if was_running:
             try:
@@ -211,7 +204,6 @@ class CellularAutomatonTui(App[None]):
         _ = self.push_screen(help_screen)
 
     def action_about(self) -> None:
-        # Pause animation if running when opening about screen
         was_running = self.canvas.running
         if was_running:
             try:
@@ -250,7 +242,9 @@ class CellularAutomatonTui(App[None]):
             if matrix_data:
                 self.canvas.matrix = np.array(matrix_data, dtype=np.int8)
             else:
-                self.canvas.matrix = np.zeros((self.canvas.canvas_height + 1, self.canvas.canvas_width + 1), dtype=np.int8)
+                self.canvas.matrix = np.zeros(
+                    (self.canvas.canvas_height + 1, self.canvas.canvas_width + 1), dtype=np.int8
+                )
 
             self.canvas.canvas_width = data.get("canvas_width", self.canvas.canvas_width)  # pyright: ignore[reportAny]
             self.canvas.canvas_height = data.get(

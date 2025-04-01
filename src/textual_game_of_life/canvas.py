@@ -1,7 +1,7 @@
 import asyncio
-import numpy as np
 import random
 import time
+import numpy as np
 from rich.segment import Segment
 from rich.style import Style
 from textual import events
@@ -15,15 +15,18 @@ from . import Operation
 
 
 class Canvas(Widget):
+    # MessageRequest must be defined as an inner class of Canvas for proper event routing.
+    # In Textual's event system, handlers like `on_canvas_message_request` specifically
+    # look for messages of type `Canvas.MessageRequest`, not standalone `MessageRequest`.
+    # When defined here, the event bubbles up correctly to the parent TUI component,
+    # ensuring messages about canvas size limits are properly displayed.
     class MessageRequest(Message):
-        """Message sent when the canvas wants to display a notification."""
-
         def __init__(self, message: str, timeout: float = 2.0) -> None:
-            self.message = message
-            self.timeout = timeout
+            self.message: str = message
+            self.timeout: float = timeout
             super().__init__()
 
-    COMPONENT_CLASSES: set[str] = {
+    COMPONENT_CLASSES: set[str] = {  # pyright: ignore[reportIncompatibleVariableOverride]
         "canvas--white-square",
         "canvas--black-square",
         "canvas--cursor-square-white",
@@ -48,9 +51,14 @@ class Canvas(Widget):
 
     CANVAS_OFFSET: int = 2
 
+    MAX_CANVAS_HEIGHT: int = 100
+    MAX_CANVAS_WIDTH: int = 100
+
+    MAX_BRUSH_SIZE: int = 10
+    MIN_BRUSH_SIZE: int = 1
+
     refresh_interval: float = 0.5
 
-    # Message display settings
     message: str = ""
     message_visible: bool = False
     message_timeout: float = 3.0  # Default timeout in seconds
@@ -58,13 +66,7 @@ class Canvas(Widget):
     message_style: Style = Style(color="bright_white", bgcolor="dark_blue", bold=True, italic=True)
     message_task: asyncio.Task[None] | None = None  # Track the current message timeout task
 
-    MAX_CANVAS_HEIGHT: int = 100
-    MAX_CANVAS_WIDTH: int = 100
-
-    # Brush size settings
     brush_size: int = 1
-    MAX_BRUSH_SIZE: int = 10
-    MIN_BRUSH_SIZE: int = 1
 
     canvas_height: int = 20
     canvas_width: int = 20
@@ -76,7 +78,6 @@ class Canvas(Widget):
 
     def __init__(self, width: int = 20, height: int = 20, speed: float = 0.5, brush_size: int = 1) -> None:
         super().__init__()
-
         self.canvas_width = width
         self.canvas_height = height
         self.refresh_interval = speed
@@ -84,34 +85,47 @@ class Canvas(Widget):
         self.mouse_captured: bool = True
 
         # Precomputed max size constraints
-        self.max_width_by_term = 0
-        self.max_height_by_term = 0
-        self.effective_max_width = 0  # Min of terminal constraint and MAX_CANVAS_WIDTH
-        self.effective_max_height = 0  # Min of terminal constraint and MAX_CANVAS_HEIGHT
+        self.max_width_by_term: int = 0
+        self.max_height_by_term: int = 0
+        self.effective_max_width: int = 0  # Min of terminal constraint and MAX_CANVAS_WIDTH
+        self.effective_max_height: int = 0  # Min of terminal constraint and MAX_CANVAS_HEIGHT
 
-        self.matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
-
-        self.message = ""
+        self.matrix: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.zeros(
+            (self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8
+        )
         self.message_visible = False
         self.message_timestamp = 0.0
         self.message_timeout = 3.0  # Default timeout in seconds
         self.message_task = None
 
     def request_message(self, text: str, timeout: float = 2.0) -> None:
-        """Request that a message be displayed by the parent application."""
+        # Set message properties directly first to ensure it's displayed
+        self.message = text
+        self.message_visible = True
+        self.message_timestamp = time.time()
+        self.message_timeout = timeout
+
+        # Then try posting the message to the parent
         try:
-            self.post_message(self.MessageRequest(text, timeout))
+            _ = self.post_message(self.MessageRequest(text, timeout))
+            try:
+                _ = self.message_task.cancel()
+            except (RuntimeError, AttributeError):
+                pass
+
+            # Create a new message timeout task
+            try:
+                self.message_task = asyncio.create_task(self._message_timeout_task())
+            except RuntimeError:
+                # No running event loop (likely in test environment)
+                pass
         except Exception:
             # In test environments or when no parent is available,
-            # just set the message locally without posting
-            self.message = text
-            self.message_visible = True
-            self.message_timestamp = time.time()
-            self.message_timeout = timeout
+            # we've already set the message locally above
+            pass
 
-    def display_message(self, text: str, timeout: float = 3.0) -> None:
-        """Legacy method - now routes to request_message for compatibility."""
-        self.request_message(text, timeout)
+        # Force refresh to ensure the message is displayed
+        _ = self.refresh()
 
     async def _message_timeout_task(self) -> None:
         try:
@@ -146,8 +160,10 @@ class Canvas(Widget):
         self.matrix = self.get_next_generation()
 
         # Find regions that changed
-        changed = np.where(old_matrix[:self.canvas_height, :self.canvas_width] !=
-                          self.matrix[:self.canvas_height, :self.canvas_width])
+        changed = np.where(
+            old_matrix[: self.canvas_height, : self.canvas_width]
+            != self.matrix[: self.canvas_height, : self.canvas_width]
+        )
 
         # Only refresh if we have changes
         if len(changed[0]) > 0:
@@ -163,57 +179,58 @@ class Canvas(Widget):
             pass
 
     async def toggle(self):
+        # Toggle the running state immediately so it's changed
+        # even if the coroutine is never awaited (e.g. in tests)
         self.running = not self.running
-        # Only enter the animation loop if we're in a real event loop context
-        # This prevents the "coroutine was never awaited" warning in tests
-        if self.running and asyncio.get_event_loop().is_running():
-            last_update = time.time()
-            while self.running:
-                now = time.time()
-                elapsed = now - last_update
 
-                # Ensure refresh_interval is never below the minimum threshold
-                if self.refresh_interval < 0.1:
-                    self.refresh_interval = 0.1
+        try:
+            # Only enter the animation loop if we're in a real event loop context
+            # This prevents the "coroutine was never awaited" warning in tests
+            if self.running and asyncio.get_event_loop().is_running():
+                last_update = time.time()
+                while self.running:
+                    now = time.time()
+                    elapsed = now - last_update
 
-                # For fast speeds, compute multiple generations at once
-                if self.refresh_interval == 0.1:
-                    # Fixed batch size for maximum speed
-                    batch_size = 3  # Use a reasonable fixed value instead of dynamic calculation
-                    for _ in range(batch_size):
-                        self.matrix = self.get_next_generation()
-                    _ = self.refresh()
-                else:
-                    self.step()
+                    # Ensure refresh_interval is never below the minimum threshold
+                    if self.refresh_interval < 0.1:
+                        self.refresh_interval = 0.1
 
-                # Calculate time remaining to wait, with a minimum to prevent CPU overload
-                elapsed = time.time() - now
-                wait_time = max(0.01, self.refresh_interval - elapsed)
-                await asyncio.sleep(wait_time)
-                last_update = now
+                    # For fast speeds, compute multiple generations at once
+                    if self.refresh_interval == 0.1:
+                        # Fixed batch size for maximum speed
+                        batch_size = 3  # Use a reasonable fixed value instead of dynamic calculation
+                        for _ in range(batch_size):
+                            self.matrix = self.get_next_generation()
+                        _ = self.refresh()
+                    else:
+                        self.step()
 
-    def get_neighbours(self, x: int, y: int) -> np.ndarray:
-        """Return the values of the 8 neighboring cells using NumPy slicing."""
+                    # Calculate time remaining to wait, with a minimum to prevent CPU overload
+                    elapsed = time.time() - now
+                    wait_time = max(0.01, self.refresh_interval - elapsed)
+                    await asyncio.sleep(wait_time)
+                    last_update = now
+        except RuntimeError:
+            # No running event loop or other runtime error
+            # The running state is already toggled at the start of the method
+            pass
+
+    def get_neighbours(self, x: int, y: int) -> np.ndarray[tuple[int, ...], np.dtype[np.int8]]:
         # Create the wrapped coordinates for the 3x3 neighborhood
-        y_indices = (np.array([y-1, y, y+1])) % self.canvas_height
-        x_indices = (np.array([x-1, x, x+1])) % self.canvas_width
+        y_indices = (np.array([y - 1, y, y + 1])) % self.canvas_height
+        x_indices = (np.array([x - 1, x, x + 1])) % self.canvas_width
 
-        # Get the 3x3 neighborhood
         neighborhood = self.matrix[np.ix_(y_indices, x_indices)]
 
-        # Set the center cell to 0 to exclude it
         neighborhood_copy = neighborhood.copy()
         neighborhood_copy[1, 1] = 0
 
-        # Return the neighbors as a flattened array
         return neighborhood_copy.flatten()
 
-    def get_next_generation(self) -> np.ndarray:
-        """Calculate the next generation using NumPy vectorized operations."""
+    def get_next_generation(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
         # Create a padded matrix with wrap-around (toroidal) boundary conditions
-        padded = np.pad(self.matrix[:self.canvas_height, :self.canvas_width],
-                        ((1, 1), (1, 1)),
-                        mode='wrap')
+        padded = np.pad(self.matrix[: self.canvas_height, : self.canvas_width], ((1, 1), (1, 1)), mode="wrap")
 
         # Count neighbors for all cells at once using sum of shifted arrays
         # This creates a sliding 3x3 window without explicit loops
@@ -224,27 +241,24 @@ class Canvas(Widget):
             for j in range(3):
                 if i == 1 and j == 1:  # Skip the center
                     continue
-                neighbors += padded[i:i+self.canvas_height, j:j+self.canvas_width]
+                neighbors += padded[i : i + self.canvas_height, j : j + self.canvas_width]
 
         # Create a new matrix based on Game of Life rules
-        current_state = self.matrix[:self.canvas_height, :self.canvas_width]
+        current_state = self.matrix[: self.canvas_height, : self.canvas_width]
         new_canvas_matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
 
         # Apply Conway's Game of Life rules vectorized:
         # 1. Any live cell with 2 or 3 live neighbors survives
         # 2. Any dead cell with exactly 3 live neighbors becomes alive
-        new_canvas_matrix[:self.canvas_height, :self.canvas_width] = (
-            ((current_state == 1) & ((neighbors == 2) | (neighbors == 3))) |
-            ((current_state == 0) & (neighbors == 3))
+        new_canvas_matrix[: self.canvas_height, : self.canvas_width] = (
+            ((current_state == 1) & ((neighbors == 2) | (neighbors == 3))) | ((current_state == 0) & (neighbors == 3))
         ).astype(np.int8)
 
         return new_canvas_matrix
 
     def random(self) -> None:
         # Generate a random matrix using NumPy's vectorized random function
-        self.matrix = np.random.randint(0, 2,
-                                       (self.canvas_height + 1, self.canvas_width + 1),
-                                       dtype=np.int8)
+        self.matrix = np.random.randint(0, 2, (self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
         _ = self.refresh()
 
     def add_random_glider(self) -> None:
@@ -298,14 +312,55 @@ class Canvas(Widget):
         # Format: (row, column)
         pulsar_pattern = [
             # Top section
-            (3, 5), (3, 6), (3, 7), (3, 11), (3, 12), (3, 13),
-            (5, 3), (6, 3), (7, 3), (5, 8), (6, 8), (7, 8), (5, 10), (6, 10), (7, 10), (5, 15), (6, 15), (7, 15),
-            (8, 5), (8, 6), (8, 7), (8, 11), (8, 12), (8, 13),
-
+            (3, 5),
+            (3, 6),
+            (3, 7),
+            (3, 11),
+            (3, 12),
+            (3, 13),
+            (5, 3),
+            (6, 3),
+            (7, 3),
+            (5, 8),
+            (6, 8),
+            (7, 8),
+            (5, 10),
+            (6, 10),
+            (7, 10),
+            (5, 15),
+            (6, 15),
+            (7, 15),
+            (8, 5),
+            (8, 6),
+            (8, 7),
+            (8, 11),
+            (8, 12),
+            (8, 13),
             # Bottom section
-            (10, 5), (10, 6), (10, 7), (10, 11), (10, 12), (10, 13),
-            (11, 3), (12, 3), (13, 3), (11, 8), (12, 8), (13, 8), (11, 10), (12, 10), (13, 10), (11, 15), (12, 15), (13, 15),
-            (15, 5), (15, 6), (15, 7), (15, 11), (15, 12), (15, 13)
+            (10, 5),
+            (10, 6),
+            (10, 7),
+            (10, 11),
+            (10, 12),
+            (10, 13),
+            (11, 3),
+            (12, 3),
+            (13, 3),
+            (11, 8),
+            (12, 8),
+            (13, 8),
+            (11, 10),
+            (12, 10),
+            (13, 10),
+            (11, 15),
+            (12, 15),
+            (13, 15),
+            (15, 5),
+            (15, 6),
+            (15, 7),
+            (15, 11),
+            (15, 12),
+            (15, 13),
         ]
 
         # Place the pulsar pattern onto the canvas
@@ -315,7 +370,7 @@ class Canvas(Widget):
 
         _ = self.refresh()
 
-    def extend_canvas(self) -> np.ndarray:
+    def extend_canvas(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
         # Create a new matrix with the new dimensions
         new_matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
 
@@ -328,12 +383,8 @@ class Canvas(Widget):
         return new_matrix
 
     def update_size_constraints(self) -> None:
-        """Update the maximum size constraints based on current terminal size."""
-        # Get current terminal size
         term_width, term_height = self.size.width, self.size.height
 
-        # Calculate max possible canvas dimensions based on terminal size
-        # Each canvas cell takes ROW_HEIGHT horizontal characters and ROW_HEIGHT/2 vertical characters
         self.max_width_by_term = term_width // self.ROW_HEIGHT
         self.max_height_by_term = term_height // int(self.ROW_HEIGHT / 2)
 
@@ -345,9 +396,7 @@ class Canvas(Widget):
         self.effective_max_width = min(self.max_width_by_term, self.MAX_CANVAS_WIDTH)
         self.effective_max_height = min(self.max_height_by_term, self.MAX_CANVAS_HEIGHT)
 
-    def on_resize(self, event) -> None:
-        """Handle terminal resize events."""
-        # Update constraints when terminal resizes
+    def on_resize(self, _: events.Resize) -> None:
         self.update_size_constraints()
 
         # If current canvas size exceeds new constraints, resize it
@@ -367,7 +416,9 @@ class Canvas(Widget):
                 self.canvas_height = self.effective_max_height
                 # Determine which limit we hit
                 if self.max_height_by_term < self.MAX_CANVAS_HEIGHT:
-                    self.request_message(f"Canvas height adjusted to fit terminal ({self.max_height_by_term} cells)", 2.0)
+                    self.request_message(
+                        f"Canvas height adjusted to fit terminal ({self.max_height_by_term} cells)", 2.0
+                    )
                 else:
                     self.request_message(f"Canvas height adjusted to maximum ({self.MAX_CANVAS_HEIGHT} cells)", 2.0)
                 size_limited = True
@@ -379,7 +430,6 @@ class Canvas(Widget):
     def alter_canvas_size(
         self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
     ) -> None:
-        """Alter the size of the canvas."""
         if self.running:
             try:
                 _ = asyncio.create_task(self.toggle())
@@ -394,7 +444,7 @@ class Canvas(Widget):
         self.effective_max_height = self.MAX_CANVAS_HEIGHT
 
         # In a real terminal, this would get updated based on terminal size
-        if hasattr(self, 'size') and self.size:
+        if hasattr(self, "size") and self.size:
             self.update_size_constraints()
 
         size_limited = False
@@ -418,6 +468,13 @@ class Canvas(Widget):
                     self.canvas_width = new_width
             elif operation.value == "decrease":
                 if self.canvas_width <= 10:
+                    # Direct approach to ensure the message is visible
+                    self.message = "Minimum canvas width reached (10 cells)"
+                    self.message_visible = True
+                    self.message_timestamp = time.time()
+                    self.message_timeout = 2.0
+                    _ = self.refresh()
+                    # Still try the standard message mechanism as well
                     self.request_message(f"Minimum canvas width reached (10 cells)", 2.0)
                     return
                 self.canvas_width -= amount
@@ -442,6 +499,13 @@ class Canvas(Widget):
                     self.canvas_height = new_height
             elif operation.value == "decrease":
                 if self.canvas_height <= 10:
+                    # Direct approach to ensure the message is visible
+                    self.message = "Minimum canvas height reached (10 cells)"
+                    self.message_visible = True
+                    self.message_timestamp = time.time()
+                    self.message_timeout = 2.0
+                    _ = self.refresh()
+                    # Still try the standard message mechanism as well
                     self.request_message(f"Minimum canvas height reached (10 cells)", 2.0)
                     return
                 self.canvas_height -= amount
@@ -455,6 +519,13 @@ class Canvas(Widget):
 
         if size_limited:
             # Display message about which limit was reached
+            # Direct approach to ensure the message is visible
+            self.message = f"Canvas size limited by {limit_reason}"
+            self.message_visible = True
+            self.message_timestamp = time.time()
+            self.message_timeout = 2.0
+            _ = self.refresh()
+            # Still try the standard message mechanism as well
             self.request_message(f"Canvas size limited by {limit_reason}", 2.0)
 
     @property
@@ -486,9 +557,10 @@ class Canvas(Widget):
 
             # only update the square that aren't out of range
             self.cursor_colour = "black"
-            if (self.cursor_square.y < self.matrix.shape[0] and
-                self.cursor_square.x < self.matrix.shape[1]):
-                self.cursor_colour = "black" if self.matrix[self.cursor_square.y, self.cursor_square.x] == 0 else "white"
+            if self.cursor_square.y < self.matrix.shape[0] and self.cursor_square.x < self.matrix.shape[1]:
+                self.cursor_colour = (
+                    "black" if self.matrix[self.cursor_square.y, self.cursor_square.x] == 0 else "white"
+                )
 
     def toggle_cell(self, x: int, y: int) -> None:
         if y < self.matrix.shape[0] and x < self.matrix.shape[1]:
@@ -525,11 +597,7 @@ class Canvas(Widget):
         return region
 
     def watch_cursor_square(self, previous_square: Offset, cursor_square: Offset) -> None:
-        """Called when the cursor square changes."""
-        # Refresh the previous cursor square
         _ = self.refresh(self.get_square_region(previous_square))
-
-        # Refresh the new cursor square
         _ = self.refresh(self.get_square_region(cursor_square))
 
     def on_mouse_up(self, _: events.MouseUp) -> None:
@@ -546,13 +614,16 @@ class Canvas(Widget):
 
     @override
     def render_line(self, y: int) -> Strip:
-        row_index = y // int(self.ROW_HEIGHT / 2)
-
-        # Check if this line should display the message
-        if self.message_visible and y == self.size.height - 2:  # Position at the bottom
-            # Create a full-width message with padding
+        # Check if this line should display the message (positioned at the bottom for better visibility)
+        if self.message_visible and y == max(0, self.size.height - 2):  # Position at the bottom
             padding = " " * 2  # Add some padding at the start
-            return Strip([Segment(f"{padding}{self.message}", self.message_style)])
+            message_text = f"{padding}{self.message}"
+            # Make sure the message doesn't exceed the width
+            if len(message_text) > self.size.width:
+                message_text = message_text[: self.size.width - 3] + "..."
+            return Strip([Segment(message_text, self.message_style)])
+
+        row_index = y // int(self.ROW_HEIGHT / 2)
 
         # Don't render canvas content for lines beyond the canvas height
         if row_index >= self.canvas_height:

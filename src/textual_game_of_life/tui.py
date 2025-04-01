@@ -13,7 +13,7 @@ from .modals import About, Help
 
 @final
 class CellularAutomatonTui(App[None]):
-    VERSION = "1.0.0"  # Hardcoded version to match pyproject.toml
+    VERSION = "1.1.0"  # Hardcoded version to match pyproject.toml
 
     # Extend parent bindings rather than replace them
     BINDINGS = [

@@ -19,6 +19,7 @@ dependencies = [
     "markdown-it-py==3.0.0",
     "mdit-py-plugins==0.4.2",
     "mdurl==0.1.2",
+    "numpy==2.2.4",
     "platformdirs==4.3.7",
     "Pygments==2.19.1",
     "rich==14.0.0",

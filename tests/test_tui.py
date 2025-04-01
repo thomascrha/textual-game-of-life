@@ -1,6 +1,7 @@
-import asyncio
 import json
+import numpy as np
 import os
+
 from unittest.mock import mock_open, patch
 
 
@@ -73,10 +74,10 @@ def test_save_load_game(app, monkeypatch):
         "canvas_width": 15,
         "canvas_height": 18,
     }
-
     # Set up app's canvas with test values
-    app.canvas.matrix = test_data["matrix"]
+    app.canvas.matrix = np.array(test_data["matrix"], dtype=np.int8)  # Convert to NumPy array
     app.canvas.canvas_width = test_data["canvas_width"]
+    app.canvas.canvas_height = test_data["canvas_height"]
     app.canvas.canvas_height = test_data["canvas_height"]
 
     # Mock the open function for save
@@ -101,4 +102,4 @@ def test_save_load_game(app, monkeypatch):
         # Check that values were loaded
         assert app.canvas.canvas_width == test_data["canvas_width"]
         assert app.canvas.canvas_height == test_data["canvas_height"]
-        assert app.canvas.matrix == test_data["matrix"]
+        assert app.canvas.matrix.tolist() == test_data["matrix"]

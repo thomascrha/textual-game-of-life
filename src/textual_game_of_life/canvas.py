@@ -1,4 +1,5 @@
 import asyncio
+import numpy as np
 import random
 import time
 from rich.segment import Segment
@@ -73,9 +74,7 @@ class Canvas(Widget):
         self.brush_size = max(min(brush_size, self.MAX_BRUSH_SIZE), self.MIN_BRUSH_SIZE)
         self.mouse_captured: bool = True
 
-        self.matrix: list[list[int]] = [
-            [0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)
-        ]
+        self.matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
 
         self.message = ""
         self.message_visible = False
@@ -127,48 +126,114 @@ class Canvas(Widget):
             _ = self.refresh()
 
     def clear(self) -> None:
-        self.matrix = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
+        self.matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
         _ = self.refresh()
 
     def step(self) -> None:
+        # Store old matrix to calculate changes
+        old_matrix = self.matrix.copy()
         self.matrix = self.get_next_generation()
-        _ = self.refresh()
+
+        # Find regions that changed
+        changed = np.where(old_matrix[:self.canvas_height, :self.canvas_width] !=
+                          self.matrix[:self.canvas_height, :self.canvas_width])
+
+        # Only refresh if we have changes
+        if len(changed[0]) > 0:
+            # For larger changes, full refresh is more efficient
+            if len(changed[0]) > (self.canvas_height * self.canvas_width) / 4:
+                _ = self.refresh()
+            else:
+                # Refresh only the changed regions
+                for y, x in zip(changed[0], changed[1]):
+                    _ = self.refresh(self.get_square_region(Offset(x, y)))
+        else:
+            # No changes - could indicate a stable pattern
+            pass
 
     async def toggle(self):
         self.running = not self.running
         # Only enter the animation loop if we're in a real event loop context
         # This prevents the "coroutine was never awaited" warning in tests
         if self.running and asyncio.get_event_loop().is_running():
+            last_update = time.time()
             while self.running:
-                await asyncio.sleep(self.refresh_interval)
-                self.step()
+                now = time.time()
+                elapsed = now - last_update
 
-    def get_neighbours(self, x: int, y: int) -> list[int]:
-        neighbours: list[int] = []
-        for i in range(-1, 2):
-            for j in range(-1, 2):
-                if i == j == 0:
-                    continue
-                neighbours.append(self.matrix[(y + i) % self.canvas_height][(x + j) % self.canvas_width])
-        return neighbours
+                # Ensure refresh_interval is never below the minimum threshold
+                if self.refresh_interval < 0.1:
+                    self.refresh_interval = 0.1
 
-    def get_next_generation(self) -> list[list[int]]:
-        new_canvas_matrix = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
-        for y in range(self.canvas_height):
-            for x in range(self.canvas_width):
-                neighbours = self.get_neighbours(x, y)
-                if self.matrix[y][x] == 1:
-                    if 2 <= sum(neighbours) <= 3:
-                        new_canvas_matrix[y][x] = 1
+                # For fast speeds, compute multiple generations at once
+                if self.refresh_interval == 0.1:
+                    # Fixed batch size for maximum speed
+                    batch_size = 3  # Use a reasonable fixed value instead of dynamic calculation
+                    for _ in range(batch_size):
+                        self.matrix = self.get_next_generation()
+                    _ = self.refresh()
                 else:
-                    if sum(neighbours) == 3:
-                        new_canvas_matrix[y][x] = 1
+                    self.step()
+
+                # Calculate time remaining to wait, with a minimum to prevent CPU overload
+                elapsed = time.time() - now
+                wait_time = max(0.01, self.refresh_interval - elapsed)
+                await asyncio.sleep(wait_time)
+                last_update = now
+
+    def get_neighbours(self, x: int, y: int) -> np.ndarray:
+        """Return the values of the 8 neighboring cells using NumPy slicing."""
+        # Create the wrapped coordinates for the 3x3 neighborhood
+        y_indices = (np.array([y-1, y, y+1])) % self.canvas_height
+        x_indices = (np.array([x-1, x, x+1])) % self.canvas_width
+
+        # Get the 3x3 neighborhood
+        neighborhood = self.matrix[np.ix_(y_indices, x_indices)]
+
+        # Set the center cell to 0 to exclude it
+        neighborhood_copy = neighborhood.copy()
+        neighborhood_copy[1, 1] = 0
+
+        # Return the neighbors as a flattened array
+        return neighborhood_copy.flatten()
+
+    def get_next_generation(self) -> np.ndarray:
+        """Calculate the next generation using NumPy vectorized operations."""
+        # Create a padded matrix with wrap-around (toroidal) boundary conditions
+        padded = np.pad(self.matrix[:self.canvas_height, :self.canvas_width],
+                        ((1, 1), (1, 1)),
+                        mode='wrap')
+
+        # Count neighbors for all cells at once using sum of shifted arrays
+        # This creates a sliding 3x3 window without explicit loops
+        neighbors = np.zeros((self.canvas_height, self.canvas_width), dtype=np.int8)
+
+        # Sum all 8 neighboring positions using slices
+        for i in range(3):
+            for j in range(3):
+                if i == 1 and j == 1:  # Skip the center
+                    continue
+                neighbors += padded[i:i+self.canvas_height, j:j+self.canvas_width]
+
+        # Create a new matrix based on Game of Life rules
+        current_state = self.matrix[:self.canvas_height, :self.canvas_width]
+        new_canvas_matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
+
+        # Apply Conway's Game of Life rules vectorized:
+        # 1. Any live cell with 2 or 3 live neighbors survives
+        # 2. Any dead cell with exactly 3 live neighbors becomes alive
+        new_canvas_matrix[:self.canvas_height, :self.canvas_width] = (
+            ((current_state == 1) & ((neighbors == 2) | (neighbors == 3))) |
+            ((current_state == 0) & (neighbors == 3))
+        ).astype(np.int8)
+
         return new_canvas_matrix
 
     def random(self) -> None:
-        for y in range(self.canvas_height):
-            for x in range(self.canvas_width):
-                self.matrix[y][x] = random.randint(0, 1)
+        # Generate a random matrix using NumPy's vectorized random function
+        self.matrix = np.random.randint(0, 2,
+                                       (self.canvas_height + 1, self.canvas_width + 1),
+                                       dtype=np.int8)
         _ = self.refresh()
 
     def add_random_glider(self) -> None:
@@ -180,20 +245,20 @@ class Canvas(Widget):
         for i in range(3):
             for j in range(3):
                 if y + i < self.canvas_height and x + j < self.canvas_width:
-                    self.matrix[y + i][x + j] = 0
+                    self.matrix[y + i, x + j] = 0
 
         # Standard glider pattern (will move southeast)
         # .O.
         # ..O
         # OOO
         if y < self.canvas_height and x + 1 < self.canvas_width:
-            self.matrix[y][x + 1] = 1  # Top middle
+            self.matrix[y, x + 1] = 1  # Top middle
         if y + 1 < self.canvas_height and x + 2 < self.canvas_width:
-            self.matrix[y + 1][x + 2] = 1  # Middle right
+            self.matrix[y + 1, x + 2] = 1  # Middle right
         if y + 2 < self.canvas_height:
             for j in range(3):
                 if x + j < self.canvas_width:
-                    self.matrix[y + 2][x + j] = 1  # Bottom row
+                    self.matrix[y + 2, x + j] = 1  # Bottom row
 
         _ = self.refresh()
 
@@ -213,46 +278,43 @@ class Canvas(Widget):
         for i in range(pulsar_size):
             for j in range(pulsar_size):
                 if y + i < self.canvas_height and x + j < self.canvas_width:
-                    self.matrix[y + i][x + j] = 0
+                    self.matrix[y + i, x + j] = 0
 
-        # Add 2-cell buffer to allow pattern to oscillate properly
-        buffer = 2
-        x += buffer
-        y += buffer
+        # Define the correct pulsar pattern
+        # This is a period-3 oscillator that requires precise positioning
 
-        # The correct pulsar pattern has 4 sets of 3-cell segments:
-        # - Horizontal segments at rows 2, 7, 9, 14 with columns 4-6 and 10-12
-        # - Vertical segments at columns 2, 7, 9, 14 with rows 4-6 and 10-12
+        # The pattern's active cells (1-indexed relative to the pattern's top-left corner)
+        # Format: (row, column)
+        pulsar_pattern = [
+            # Top section
+            (3, 5), (3, 6), (3, 7), (3, 11), (3, 12), (3, 13),
+            (5, 3), (6, 3), (7, 3), (5, 8), (6, 8), (7, 8), (5, 10), (6, 10), (7, 10), (5, 15), (6, 15), (7, 15),
+            (8, 5), (8, 6), (8, 7), (8, 11), (8, 12), (8, 13),
 
-        # Create full coordinates list for all cells in the pulsar
-        pulsar_cells: list[tuple[int, int]] = []
+            # Bottom section
+            (10, 5), (10, 6), (10, 7), (10, 11), (10, 12), (10, 13),
+            (11, 3), (12, 3), (13, 3), (11, 8), (12, 8), (13, 8), (11, 10), (12, 10), (13, 10), (11, 15), (12, 15), (13, 15),
+            (15, 5), (15, 6), (15, 7), (15, 11), (15, 12), (15, 13)
+        ]
 
-        # Top and bottom horizontal bars
-        for row in [0, 5, 7, 12]:
-            for col in range(2, 5):
-                pulsar_cells.append((row, col))
-                pulsar_cells.append((row, col + 6))
-
-        # Left and right vertical bars
-        for col in [0, 5, 7, 12]:
-            for row in range(2, 5):
-                pulsar_cells.append((row, col))
-                pulsar_cells.append((row + 6, col))
-
-        # Place all cells of the pulsar
-        for row, col in pulsar_cells:
-            if y + row < self.canvas_height and x + col < self.canvas_width:
-                self.matrix[y + row][x + col] = 1
+        # Place the pulsar pattern onto the canvas
+        for row, col in pulsar_pattern:
+            if (y + row) < self.canvas_height and (x + col) < self.canvas_width:
+                self.matrix[y + row, x + col] = 1
 
         _ = self.refresh()
 
-    def extend_canvas(self) -> list[list[int]]:
-        matirx = [[0 for _ in range(self.canvas_width + 1)] for _ in range(self.canvas_height + 1)]
-        for y, _ in enumerate(self.matrix):
-            for x, value in enumerate(self.matrix[y]):
-                if len(matirx) > y and len(matirx[y]) > x:
-                    matirx[y][x] = value
-        return matirx
+    def extend_canvas(self) -> np.ndarray:
+        # Create a new matrix with the new dimensions
+        new_matrix = np.zeros((self.canvas_height + 1, self.canvas_width + 1), dtype=np.int8)
+
+        # Copy over the existing data, limited by the smaller of the old and new dimensions
+        old_height, old_width = self.matrix.shape
+        copy_height = min(old_height, self.canvas_height + 1)
+        copy_width = min(old_width, self.canvas_width + 1)
+
+        new_matrix[:copy_height, :copy_width] = self.matrix[:copy_height, :copy_width]
+        return new_matrix
 
     def alter_canvas_size(
         self, operation: Operation, horizontally: bool = True, vertically: bool = True, *, amount: int = 10
@@ -322,14 +384,16 @@ class Canvas(Widget):
             if self.mouse_captured and event.button == 1:  # Left mouse button
                 self.toggle_cell(self.cursor_square.x, self.cursor_square.y)
 
-        # only update the square that aren't out of range
-        self.cursor_colour = "black"
-        if len(self.matrix) > self.cursor_square.y and len(self.matrix[self.cursor_square.y]) > self.cursor_square.x:
-            self.cursor_colour = "black" if self.matrix[self.cursor_square.y][self.cursor_square.x] == 0 else "white"
+            # only update the square that aren't out of range
+            self.cursor_colour = "black"
+            if (self.cursor_square.y < self.matrix.shape[0] and
+                self.cursor_square.x < self.matrix.shape[1]):
+                self.cursor_colour = "black" if self.matrix[self.cursor_square.y, self.cursor_square.x] == 0 else "white"
 
     def toggle_cell(self, x: int, y: int) -> None:
-        if len(self.matrix) > y and len(self.matrix[y]) > x:
-            self.matrix[y][x] ^= 1
+        if y < self.matrix.shape[0] and x < self.matrix.shape[1]:
+            # Use XOR operation to toggle between 0 and 1
+            self.matrix[y, x] ^= 1
             _ = self.refresh(self.get_square_region(Offset(x, y)))
 
     def on_click(self, event: events.Click) -> None:
@@ -351,9 +415,9 @@ class Canvas(Widget):
     def get_square_region(self, square_offset: Offset) -> Region:
         x, y = square_offset
         region = Region(
-            x * self.ROW_HEIGHT,
-            y * int(self.ROW_HEIGHT / 2),
-            self.ROW_HEIGHT,
+            int(x * self.ROW_HEIGHT),
+            int(y * int(self.ROW_HEIGHT / 2)),
+            int(self.ROW_HEIGHT),
             int(self.ROW_HEIGHT / 2),
         )
         # Move the region in to the widgets frame of reference
@@ -401,8 +465,8 @@ class Canvas(Widget):
             else:
                 square_style = self.black
                 # only update the square that aren't out of range
-                if len(self.matrix) > row and len(self.matrix[row]) > column:
-                    square_style = self.black if self.matrix[row][column] == 1 else self.white
+                if row < self.matrix.shape[0] and column < self.matrix.shape[1]:
+                    square_style = self.black if self.matrix[row, column] == 1 else self.white
 
             return square_style
 

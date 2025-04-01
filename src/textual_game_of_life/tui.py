@@ -1,5 +1,6 @@
 import asyncio
 import json
+import numpy as np
 import os
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -117,8 +118,10 @@ class CellularAutomatonTui(App[None]):
         self.display_message(status, 1.0)
 
     def action_increase_speed(self) -> None:
-        if self.canvas.refresh_interval <= 0.1:
-            self.display_message("Speed is already at maximum", 1.0)
+        # Ensure we don't go below the minimum threshold of 0.1
+        if self.canvas.refresh_interval <= 0.2:
+            self.canvas.refresh_interval = 0.1  # Set to exact minimum
+            self.display_message("Speed is at maximum (0.1s per step)", 1.0)
             return
 
         self.canvas.refresh_interval -= 0.1
@@ -189,7 +192,7 @@ class CellularAutomatonTui(App[None]):
 
     def action_save(self) -> None:
         data = {
-            "matrix": self.canvas.matrix,
+            "matrix": self.canvas.matrix.tolist(),  # Convert NumPy array to list for JSON serialization
             "canvas_width": self.canvas.canvas_width,
             "canvas_height": self.canvas.canvas_height,
         }
@@ -207,10 +210,13 @@ class CellularAutomatonTui(App[None]):
 
         with open(filepath) as load_file:
             data = json.load(load_file)  # pyright: ignore[reportAny]
-            self.canvas.matrix = data.get(  # pyright: ignore[reportAny]
-                "matrix",
-                [[0 for _ in range(self.canvas.canvas_width + 1)] for _ in range(self.canvas.canvas_height + 1)],
-            )
+            # Convert the loaded matrix (which is a list of lists) to a NumPy array
+            matrix_data = data.get("matrix", [])  # pyright: ignore[reportAny]
+            if matrix_data:
+                self.canvas.matrix = np.array(matrix_data, dtype=np.int8)
+            else:
+                self.canvas.matrix = np.zeros((self.canvas.canvas_height + 1, self.canvas.canvas_width + 1), dtype=np.int8)
+
             self.canvas.canvas_width = data.get("canvas_width", self.canvas.canvas_width)  # pyright: ignore[reportAny]
             self.canvas.canvas_height = data.get(
                 "canvas_height", self.canvas.canvas_height
